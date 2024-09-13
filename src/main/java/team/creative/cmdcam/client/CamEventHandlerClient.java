@@ -333,7 +333,7 @@ public class CamEventHandlerClient {
                 pos.add(CMDCamClient.getTargetMarker());
             bufferbuilder.vertex((float) pos.x, (float) pos.y, (float) pos.z).color((float) color.x, (float) color.y, (float) color.z, 1).endVertex();
         }
-        Vec3d last = scene.points.get(scene.points.size() - 1).copy();
+        Vec3d last = interpolation.valueAt(1);
         if (CMDCamClient.hasTargetMarker())
             last.add(CMDCamClient.getTargetMarker());
         bufferbuilder.vertex((float) last.x, (float) last.y, (float) last.z).color((float) color.x, (float) color.y, (float) color.z, 1).endVertex();
