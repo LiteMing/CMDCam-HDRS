@@ -1,7 +1,7 @@
 plugins {
     id 'eclipse'
     id 'idea'
-    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'net.minecraftforge.gradle' version '6.0.54'
     id 'com.diffplug.eclipse.apt'
     id 'org.spongepowered.mixin'
     id 'com.modrinth.minotaur' version '2.+'
@@ -78,12 +78,13 @@ dependencies {
     minecraftLibrary fg.deobf("curse.maven:minema-resurrection-596719:4816846")
 }
 
-modDependencies = [
-    [ modId: "creativecore", mandatory: true, ordering: "NONE", side: "BOTH", versionRange: creativecore_version ]
-]
+// modDependencies = [
+//     [ modId: "creativecore", mandatory: true, ordering: "NONE", side: "BOTH", versionRange: creativecore_version ]
+// ]
 
 mixin {
     add sourceSets.main, 'cmdcam.mixin.refmap.json'
      
     config 'cmdcam.mixins.json'
 }
+

@@ -6,7 +6,7 @@ license="LGPL-3.0-only"
 [[mods]]
     modId="cmdcam"
     logoFile="cmdcam.png"
-    version="2.2.0"
+    version="2.2.0-HDRS-0.0.1"
     displayName="CMDCam"
     displayURL="https://modrinth.com/mod/cmdcam"
     authors="CreativeMD"
@@ -31,5 +31,5 @@ license="LGPL-3.0-only"
    mandatory=true
    ordering="NONE"
    side="BOTH"
-   versionRange="2.11.5"
+   versionRange="[2.11.5,)"
 

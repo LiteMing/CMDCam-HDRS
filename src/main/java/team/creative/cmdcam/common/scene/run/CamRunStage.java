@@ -77,25 +77,7 @@ public class CamRunStage {
         CamPoint point = new CamPoint(generated);
         
         CamPoint targetPoint = new CamPoint(0, 0, 0, 0, 0, 0, 0);
-        Entity camera = run.scene.mode.getCamera();
-        Vec3d camPos = new Vec3d(camera.getPosition(partialTicks));
-        
-        if (run.scene.lookTarget != null) {
-            Vec3d vec = run.scene.lookTarget.position(level, partialTicks);
-            
-            if (vec != null) {
-                run.scene.mode.correctTargetPosition(vec);
-                
-                double d0 = vec.x - camPos.x;
-                double d1 = vec.y - camPos.y;
-                double d2 = vec.z - camPos.z;
-                
-                double d3 = Math.sqrt(d0 * d0 + d2 * d2);
-                targetPoint.rotationPitch = (-(Math.atan2(d1, d3) * 180.0D / Math.PI));
-                targetPoint.rotationYaw = (Math.atan2(d2, d0) * 180.0D / Math.PI) - 90.0D;
-            }
-        }
-        
+
         if (run.scene.posTarget != null) {
             targetPoint.set(point);
             var newPos = run.scene.posTarget.position(level, partialTicks);
@@ -103,6 +85,22 @@ public class CamRunStage {
                 Vec3d vec = new Vec3d(newPos);
                 run.scene.mode.correctTargetPosition(vec);
                 targetPoint.add(vec);
+            }
+        }
+
+        if (run.scene.lookTarget != null) {
+            Vec3d vec = run.scene.lookTarget.position(level, partialTicks);
+
+            if (vec != null) {
+                run.scene.mode.correctTargetPosition(vec);
+
+                double d0 = vec.x - targetPoint.x;
+                double d1 = vec.y - targetPoint.y;
+                double d2 = vec.z - targetPoint.z;
+
+                double d3 = Math.sqrt(d0 * d0 + d2 * d2);
+                targetPoint.rotationPitch = (-(Math.atan2(d1, d3) * 180.0D / Math.PI));
+                targetPoint.rotationYaw = (Math.atan2(d2, d0) * 180.0D / Math.PI) - 90.0D;
             }
         }
         
