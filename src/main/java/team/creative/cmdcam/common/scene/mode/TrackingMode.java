@@ -135,7 +135,7 @@ public abstract class TrackingMode extends OutsideMode {
             result.x = anchor.x + offset.x;
             result.y = anchor.y + offset.y;
             result.z = anchor.z + offset.z;
-            applyTemplateRotation(result, pose, appliedPitch, options);
+            applyTemplateRotation(result, pose, appliedYaw, appliedPitch, options);
             if (options.fov != null)
                 result.zoom = options.fovOrDefault(defaultFov);
             return result;
@@ -167,6 +167,6 @@ public abstract class TrackingMode extends OutsideMode {
      * target.
      */
     @OnlyIn(Dist.CLIENT)
-    protected void applyTemplateRotation(CamPoint result, CamTargetPose pose, float appliedPitch, TrackingOptions options) {}
+    protected void applyTemplateRotation(CamPoint result, CamTargetPose pose, float appliedYaw, float appliedPitch, TrackingOptions options) {}
     
 }

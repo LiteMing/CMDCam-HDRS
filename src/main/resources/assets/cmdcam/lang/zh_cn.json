@@ -72,6 +72,8 @@
     "scene.tracking.invalid_fov": "视场角必须在 %s 到 %s 之间。",
     "scene.tracking.invalid_damping": "阻尼必须在 %s 到 %s 毫秒之间。",
     "scene.tracking.invalid_pitch_follow": "俯仰跟随强度必须在 %s 到 %s 之间。",
+    "scene.tracking.invalid_yaw_follow": "水平偏航跟随强度必须在 %s 到 %s 之间。",
+    "scene.tracking.invalid_height_factor": "目标高度因子必须在 %s 到 %s 之间。",
     "cam.mode.shoulder": "越肩",
     "cam.mode.closeup": "正面特写",
     "cam.mode.tracking": "实体绑定路径",

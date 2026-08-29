@@ -23,7 +23,7 @@ import team.creative.cmdcam.common.target.CamTargetPose;
  * <ul>
  *   <li><b>Local-space (preferred)</b>: {@code trackingReferenceYaw != NaN}.  Control-point yaws
  *       were authored relative to the target's body yaw at record time. On playback the authored
- *       yaw is rotated by {@code currentBodyYaw - trackingReferenceYaw}, so the camera looks in
+ *       yaw is rotated by {@code appliedYaw - trackingReferenceYaw}, so the camera looks in
  *       the correct direction from the very first frame, regardless of which way the target is
  *       facing.</li>
  *   <li><b>Legacy / absolute</b>: {@code trackingReferenceYaw == NaN}.  Fallback for scenes
@@ -59,13 +59,13 @@ public class FollowPathMode extends TrackingMode {
     
     @Override
     @OnlyIn(Dist.CLIENT)
-    protected void applyTemplateRotation(CamPoint result, CamTargetPose pose, float appliedPitch, TrackingOptions options) {
+    protected void applyTemplateRotation(CamPoint result, CamTargetPose pose, float appliedYaw, float appliedPitch, TrackingOptions options) {
         float refYaw = scene.trackingReferenceYaw;
         
         if (!Float.isNaN(refYaw)) {
             // Local-space mode: authored yaws are relative to refYaw.
-            // Rotate them by the delta between the target's current yaw and the authoring yaw.
-            float delta = Mth.wrapDegrees(pose.bodyYaw - refYaw);
+            // Rotate them by the delta between the target's current applied yaw and the authoring yaw.
+            float delta = Mth.wrapDegrees(appliedYaw - refYaw);
             result.rotationYaw = Mth.wrapDegrees(result.rotationYaw + delta);
             // Pitch offset: authored pitch was relative to basePitch captured at start().
             // We don't have a reference pitch in local-space mode, so we use 0 (no offset),
@@ -73,13 +73,13 @@ public class FollowPathMode extends TrackingMode {
             result.rotationPitch = Mth.clamp(result.rotationPitch + appliedPitch, -90.0D, 90.0D);
         } else {
             // Legacy mode: capture the target's pose on the first valid frame and accumulate
-            // the delta from there. This is unchanged from the original behaviour.
+            // the delta from there.
             if (!baseCaptured) {
                 baseCaptured = true;
-                baseYaw = pose.bodyYaw;
+                baseYaw = appliedYaw;
                 basePitch = appliedPitch;
             }
-            result.rotationYaw += Mth.wrapDegrees(pose.bodyYaw - baseYaw);
+            result.rotationYaw = Mth.wrapDegrees(result.rotationYaw + Mth.wrapDegrees(appliedYaw - baseYaw));
             result.rotationPitch = Mth.clamp(result.rotationPitch + (appliedPitch - basePitch), -90.0D, 90.0D);
         }
     }

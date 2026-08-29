@@ -127,9 +127,9 @@ public class TrackingOptions {
         if (invalid(pitchFollow, MIN_PITCH_FOLLOW, MAX_PITCH_FOLLOW))
             throw new SceneException("scene.tracking.invalid_pitch_follow", MIN_PITCH_FOLLOW, MAX_PITCH_FOLLOW);
         if (invalid(yawFollow, MIN_YAW_FOLLOW, MAX_YAW_FOLLOW))
-            throw new SceneException("scene.tracking.invalid_pitch_follow", MIN_YAW_FOLLOW, MAX_YAW_FOLLOW);
+            throw new SceneException("scene.tracking.invalid_yaw_follow", MIN_YAW_FOLLOW, MAX_YAW_FOLLOW);
         if (invalid(targetHeightFactor, 0.0D, 1.0D))
-            throw new SceneException("scene.tracking.invalid_pitch_follow", 0.0D, 1.0D);
+            throw new SceneException("scene.tracking.invalid_height_factor", 0.0D, 1.0D);
     }
     
     public CompoundTag save(CompoundTag nbt) {
