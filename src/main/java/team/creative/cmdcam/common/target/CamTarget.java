@@ -8,9 +8,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import team.creative.creativecore.common.util.math.vec.Vec3d;
@@ -39,6 +42,28 @@ public abstract class CamTarget {
     }
     
     public abstract Vec3d position(Level world, float partialTicks);
+    
+    public CamTargetPose pose(Level level, float partialTicks) {
+        Vec3d pos = position(level, partialTicks);
+        if (pos == null)
+            return CamTargetPose.invalid();
+        return new CamTargetPose(pos, 0, 0, 0f, 0f);
+    }
+    
+    protected static CamTargetPose poseOf(Entity entity, float partialTicks) {
+        if (entity == null || !entity.isAlive())
+            return CamTargetPose.invalid();
+        Vec3 eye = entity.getEyePosition(partialTicks);
+        float yaw;
+        if (entity instanceof LivingEntity living)
+            yaw = Mth.rotLerp(partialTicks, living.yBodyRotO, living.yBodyRot);
+        else
+            yaw = Mth.rotLerp(partialTicks, entity.yRotO, entity.getYRot());
+        if (Float.isNaN(yaw))
+            yaw = Mth.rotLerp(partialTicks, entity.yRotO, entity.getYRot());
+        float pitch = Mth.rotLerp(partialTicks, entity.xRotO, entity.getXRot());
+        return new CamTargetPose(new Vec3d(eye), entity.getBbHeight(), entity.getEyeHeight(), yaw, pitch);
+    }
     
     protected abstract void saveExtra(CompoundTag nbt);
     
@@ -102,17 +127,28 @@ public abstract class CamTarget {
             this.uuid = entity.getUUID();
         }
         
-        @Override
-        @OnlyIn(Dist.CLIENT)
-        public void start(Level level) {
+        public EntityTarget(UUID uuid) {
+            this.uuid = uuid;
+        }
+        
+        private void resolve(Level level) {
+            if (cachedEntity != null && (!cachedEntity.isAlive() || cachedEntity.level() != level))
+                cachedEntity = null;
+            if (cachedEntity != null)
+                return;
             if (level instanceof ServerLevel)
                 cachedEntity = ((ServerLevel) level).getEntities().get(uuid);
-            else
+            else if (level instanceof ClientLevel)
                 for (Entity entity : ((ClientLevel) level).entitiesForRendering())
                     if (entity.getUUID().equals(uuid)) {
                         cachedEntity = entity;
                         break;
                     }
+        }
+        
+        @Override
+        public void start(Level level) {
+            resolve(level);
         }
         
         @Override
@@ -122,13 +158,16 @@ public abstract class CamTarget {
         
         @Override
         public Vec3d position(Level level, float partialTicks) {
-            if (cachedEntity != null && !cachedEntity.isAlive())
-                cachedEntity = null;
-            
-            if (cachedEntity != null)
-                return new Vec3d(cachedEntity.getEyePosition(partialTicks));
-            
-            return null;
+            resolve(level);
+            if (cachedEntity == null)
+                return null;
+            return new Vec3d(cachedEntity.getEyePosition(partialTicks));
+        }
+        
+        @Override
+        public CamTargetPose pose(Level level, float partialTicks) {
+            resolve(level);
+            return poseOf(cachedEntity, partialTicks);
         }
         
         @Override
@@ -209,6 +248,11 @@ public abstract class CamTarget {
                 return null;
             
             return new Vec3d(cachedPlayer.getEyePosition(partialTicks));
+        }
+        
+        @Override
+        public CamTargetPose pose(Level level, float partialTicks) {
+            return poseOf(cachedPlayer, partialTicks);
         }
         
         @Override

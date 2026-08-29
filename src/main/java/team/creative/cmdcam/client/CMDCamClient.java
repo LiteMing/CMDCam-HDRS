@@ -29,6 +29,7 @@ import team.creative.cmdcam.common.math.point.CamPoint;
 import team.creative.cmdcam.common.packet.GetPathPacket;
 import team.creative.cmdcam.common.packet.SetPathPacket;
 import team.creative.cmdcam.common.scene.CamScene;
+import team.creative.cmdcam.common.scene.run.CamStopReason;
 import team.creative.creativecore.client.CreativeCoreClient;
 
 public class CMDCamClient {
@@ -194,6 +195,31 @@ public class CMDCamClient {
         playing.play();
     }
     
+    public static void startCloseup(CamScene scene) {
+        if (playing != null)
+            finishImmediately(CamStopReason.OVERWRITE);
+        start(scene);
+    }
+    
+    public static void requestStop(CamStopReason reason) {
+        if (playing == null)
+            return;
+        if (reason.smoothReturn && playing.tracking && playing.run != null)
+            playing.run.requestReturn();
+        else
+            finishImmediately(reason);
+    }
+    
+    public static void finishImmediately(CamStopReason reason) {
+        if (playing == null)
+            return;
+        CamScene scene = playing;
+        playing = null;
+        mc.options.hideGui = hideGuiCache;
+        if (mc.level != null)
+            scene.finish(mc.level);
+    }
+    
     public static void pause() {
         if (playing != null)
             playing.pause();
@@ -210,17 +236,13 @@ public class CMDCamClient {
             return;
         if (playing.serverSynced())
             return;
-        playing.finish(mc.level);
-        playing = null;
-        mc.options.hideGui = hideGuiCache;
+        requestStop(CamStopReason.COMMAND_STOP);
     }
     
     public static void stopServer() {
         if (playing == null)
             return;
-        playing.finish(mc.level);
-        playing = null;
-        mc.options.hideGui = hideGuiCache;
+        requestStop(CamStopReason.COMMAND_STOP);
     }
     
     public static void noTickPath(Level level, float renderTickTime) {
@@ -228,12 +250,15 @@ public class CMDCamClient {
     }
     
     public static void gameTickPath(Level level) {
-        playing.gameTick(level);
+        if (playing != null)
+            playing.gameTick(level);
     }
     
     public static void renderTickPath(Level level, float renderTickTime) {
+        if (playing == null)
+            return;
         playing.renderTick(level, renderTickTime);
-        if (!playing.playing()) {
+        if (playing == null || !playing.playing()) {
             mc.options.hideGui = hideGuiCache;
             playing = null;
         }

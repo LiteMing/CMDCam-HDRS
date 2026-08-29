@@ -11,6 +11,7 @@ import team.creative.cmdcam.client.SceneException;
 import team.creative.cmdcam.common.math.point.CamPoint;
 import team.creative.cmdcam.common.scene.CamScene;
 import team.creative.cmdcam.common.target.CamTarget;
+import team.creative.cmdcam.common.target.CamTargetPose;
 import team.creative.creativecore.common.util.math.vec.Vec3d;
 import team.creative.creativecore.common.util.mc.TickUtils;
 
@@ -47,7 +48,19 @@ public interface CamCommandProcessor {
     
     public default void makeRelative(CamScene scene, Level level, CamPoint point) throws SceneException {
         if (scene.posTarget != null) {
-            Vec3d vec = scene.posTarget.position(level, TickUtils.getFrameTime(level));
+            float partial = TickUtils.getFrameTime(level);
+            if (scene.tracking) {
+                CamTargetPose pose = scene.posTarget.pose(level, partial);
+                if (!pose.valid)
+                    throw new SceneException("scene.follow.not_found");
+                Vec3d anchor = pose.anchor(scene.targetHeightFactor);
+                if (anchor == null)
+                    throw new SceneException("scene.follow.not_found");
+                point.sub(anchor);
+                pose.worldToLocal(point);
+                return;
+            }
+            Vec3d vec = scene.posTarget.position(level, partial);
             if (vec == null)
                 throw new SceneException("scene.follow.not_found");
             point.sub(vec);
@@ -57,6 +70,14 @@ public interface CamCommandProcessor {
     public boolean requiresSceneName();
     
     public boolean requiresPlayer();
+    
+    public default boolean supportsCloseup() {
+        return false;
+    }
+    
+    public default void startCloseup(CommandContext<CommandSourceStack> context) throws SceneException {}
+    
+    public default void closeup(CommandContext<CommandSourceStack> context, String mode, long duration) throws SceneException {}
     
     public void start(CommandContext<CommandSourceStack> context) throws SceneException;
     

@@ -13,6 +13,7 @@ import team.creative.cmdcam.common.math.interpolation.CamInterpolation;
 import team.creative.cmdcam.common.math.point.CamPoint;
 import team.creative.cmdcam.common.math.point.CamPoints;
 import team.creative.cmdcam.common.scene.attribute.CamAttribute;
+import team.creative.cmdcam.common.scene.mode.TrackingMode;
 import team.creative.creativecore.common.util.math.interpolation.Interpolation;
 import team.creative.creativecore.common.util.math.vec.Vec3d;
 import team.creative.creativecore.common.util.math.vec.VecNd;
@@ -26,6 +27,7 @@ public class CamRunStage {
     private boolean started = false;
     private HashMap<CamAttribute, Interpolation> attributes = new HashMap<>();
     private HashMap<CamAttribute, CamFollow> followAttributes;
+    private CamPoint lastTrackedPoint;
     
     public CamRunStage(CamRun run, CamInterpolation inter, long duration, int loops, CamPoints points) {
         this.run = run;
@@ -75,6 +77,17 @@ public class CamRunStage {
             generated.put(entry.getKey(), entry.getValue().valueAt(progress));
         
         CamPoint point = new CamPoint(generated);
+        
+        if (run.scene.tracking && run.scene.mode instanceof TrackingMode tracking) {
+            CamPoint tracked = tracking.calculate(run.scene, level, partialTicks, point);
+            if (tracked != null) {
+                lastTrackedPoint = tracked.copy();
+                return tracked;
+            }
+            if (lastTrackedPoint != null)
+                return lastTrackedPoint.copy();
+            return point;
+        }
         
         CamPoint targetPoint = new CamPoint(0, 0, 0, 0, 0, 0, 0);
 

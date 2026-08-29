@@ -21,6 +21,7 @@ import team.creative.cmdcam.common.scene.CamScene;
 import team.creative.cmdcam.common.scene.attribute.CamAttribute;
 import team.creative.cmdcam.common.scene.timer.RealTimeTimer;
 import team.creative.cmdcam.common.scene.timer.RunTimer;
+import team.creative.creativecore.common.util.mc.TickUtils;
 
 @OnlyIn(Dist.CLIENT)
 public class CamRun {
@@ -38,6 +39,9 @@ public class CamRun {
     private boolean running;
     private int currentStage;
     private boolean finished;
+    private int returnStageIndex = -1;
+    private boolean returnRequested = false;
+    private int targetMissingTicks = 0;
     
     public CamRun(Level level, CamScene scene) {
         Entity camera = Minecraft.getInstance().player;
@@ -100,6 +104,16 @@ public class CamRun {
             stages.add(new CamRunStage(this, scene.interpolation, scene.duration, 0, points));
         }
         
+        if (scene.tracking && scene.targetReturnDuration > 0 && camera != null) {
+            CamPoints points = new CamPoints();
+            CamPoint p = CamPoint.create(camera);
+            points.add(p);
+            points.add(p.copy());
+            points.fixSpinning(scene.pitchMode);
+            this.returnStageIndex = stages.size();
+            stages.add(new CamReturnStage(this, scene.targetReturnDuration, points));
+        }
+        
         this.currentStage = 0;
         this.timer = MinemaAddon.installed() ? new MinemaTimer() : new RealTimeTimer();
         this.finished = false;
@@ -107,6 +121,12 @@ public class CamRun {
     }
     
     public void renderTick(Level level, float deltaTime) {
+        if (returnRequested && returnStageIndex >= 0) {
+            returnRequested = false;
+            timer.stageCompleted();
+            currentStage = returnStageIndex;
+        }
+        
         CamRunStage stage = stages.get(currentStage);
         
         if (!stage.hasStarted())
@@ -137,6 +157,20 @@ public class CamRun {
     
     public void gameTick(Level level) {
         timer.tick(running);
+        if (scene.tracking && !returnRequested && returnStageIndex >= 0 && scene.posTarget != null
+                && !(stages.get(currentStage) instanceof CamReturnStage)) {
+            float partial = TickUtils.getFrameTime(level);
+            if (!scene.posTarget.pose(level, partial).valid) {
+                if (++targetMissingTicks >= 15)
+                    requestReturn();
+            } else
+                targetMissingTicks = 0;
+        }
+    }
+    
+    public void requestReturn() {
+        if (returnStageIndex >= 0)
+            returnRequested = true;
     }
     
     public CamAttribute[] attributes() {

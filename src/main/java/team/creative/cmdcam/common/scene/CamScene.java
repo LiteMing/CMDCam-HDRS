@@ -2,6 +2,7 @@ package team.creative.cmdcam.common.scene;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -56,6 +57,10 @@ public class CamScene {
     public CamPitchMode pitchMode = CamPitchMode.FIX_KEEP_DIRECTION;
     public boolean distanceBasedTiming = false;
     
+    public boolean tracking = false;
+    public double targetHeightFactor = 0.65D;
+    public long targetReturnDuration = 750L;
+    
     @OnlyIn(Dist.CLIENT)
     public CamRun run;
     
@@ -92,6 +97,15 @@ public class CamScene {
     
     public void setServerSynced() {
         serverSynced = true;
+    }
+    
+    public CamScene bindTracking(UUID uuid, double heightFactor, long returnDuration) {
+        this.tracking = true;
+        this.targetHeightFactor = heightFactor;
+        this.targetReturnDuration = returnDuration;
+        this.lookTarget = new CamTarget.EntityTarget(uuid);
+        this.posTarget = new CamTarget.EntityTarget(uuid);
+        return this;
     }
     
     public CompoundTag save(CompoundTag nbt) {
@@ -135,7 +149,7 @@ public class CamScene {
     }
     
     public boolean paused() {
-        return !run.playing();
+        return run == null || !run.playing();
     }
     
     public void togglePause() {
@@ -147,15 +161,18 @@ public class CamScene {
     }
     
     public void pause() {
-        run.pause();
+        if (run != null)
+            run.pause();
     }
     
     public void resume() {
-        run.resume();
+        if (run != null)
+            run.resume();
     }
     
     public void stop() {
-        run.stop();
+        if (run != null)
+            run.stop();
     }
     
     public boolean playing() {
@@ -181,7 +198,7 @@ public class CamScene {
             posTarget.finish();
         
         stop();
-        if (level.isClientSide) {
+        if (level.isClientSide && run != null) {
             mode.finished(run);
             run.finish();
             run = null;
@@ -196,7 +213,8 @@ public class CamScene {
             started(level);
         }
         
-        run.renderTick(level, deltaTime);
+        if (run != null)
+            run.renderTick(level, deltaTime);
     }
     
     public void gameTick(Level level) {
@@ -205,7 +223,8 @@ public class CamScene {
             started(level);
         }
         
-        run.gameTick(level);
+        if (run != null)
+            run.gameTick(level);
     }
     
     public void set(CamScene scene) {

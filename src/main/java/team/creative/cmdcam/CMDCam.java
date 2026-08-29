@@ -39,6 +39,7 @@ import team.creative.cmdcam.common.packet.GetPathPacket;
 import team.creative.cmdcam.common.packet.PausePathPacket;
 import team.creative.cmdcam.common.packet.ResumePathPacket;
 import team.creative.cmdcam.common.packet.SetPathPacket;
+import team.creative.cmdcam.common.packet.StartCloseupPacket;
 import team.creative.cmdcam.common.packet.StartPathPacket;
 import team.creative.cmdcam.common.packet.StopPathPacket;
 import team.creative.cmdcam.common.packet.TeleportPathPacket;
@@ -82,6 +83,7 @@ public class CMDCam {
         NETWORK.registerType(GetPathPacket.class, GetPathPacket::new);
         NETWORK.registerType(SetPathPacket.class, SetPathPacket::new);
         NETWORK.registerType(StartPathPacket.class, StartPathPacket::new);
+        NETWORK.registerType(StartCloseupPacket.class, StartCloseupPacket::new);
         NETWORK.registerType(StopPathPacket.class, StopPathPacket::new);
         NETWORK.registerType(TeleportPathPacket.class, TeleportPathPacket::new);
         NETWORK.registerType(PausePathPacket.class, PausePathPacket::new);
@@ -96,6 +98,7 @@ public class CMDCam {
         LiteralArgumentBuilder<CommandSourceStack> camServer = Commands.literal("cam-server");
         
         SceneStartCommandBuilder.start(camServer, CMDCamServer.PROCESSOR);
+        SceneStartCommandBuilder.quick(camServer, CMDCamServer.PROCESSOR);
         
         LiteralArgumentBuilder<CommandSourceStack> get = Commands.literal("get");
         SceneCommandBuilder.scene(get, CMDCamServer.PROCESSOR);

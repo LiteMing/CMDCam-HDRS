@@ -19,6 +19,8 @@ public abstract class CamMode {
     static {
         REGISTRY.register("default", DefaultMode.class);
         REGISTRY.register("outside", OutsideMode.class);
+        REGISTRY.register("shoulder", ShoulderMode.class);
+        REGISTRY.register("closeup", FrontCloseupMode.class);
     }
     
     public final CamScene scene;

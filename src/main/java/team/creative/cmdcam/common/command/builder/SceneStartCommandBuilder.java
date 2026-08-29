@@ -3,6 +3,7 @@ package team.creative.cmdcam.common.command.builder;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -16,7 +17,8 @@ import team.creative.cmdcam.common.scene.CamScene;
 public class SceneStartCommandBuilder {
     
     public static void start(ArgumentBuilder<CommandSourceStack, ?> origin, CamCommandProcessor processor) {
-        ArgumentBuilder<CommandSourceStack, ?> startO = Commands.literal("start");
+        boolean server = processor.requiresSceneName();
+        ArgumentBuilder<CommandSourceStack, ?> startO = Commands.literal(server ? "play" : "start");
         ArgumentBuilder<CommandSourceStack, ?> start = startO;
         
         if (processor.requiresPlayer())
@@ -65,6 +67,50 @@ public class SceneStartCommandBuilder {
             else
                 origin.then(startO);
         }
+        
+        if (server && processor.supportsCloseup()) {
+            ArgumentBuilder<CommandSourceStack, ?> closeupStart = Commands.literal("start")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.argument("name", StringArgumentType.string())
+                    .then(Commands.argument("target", EntityArgument.entity())
+                        .then(Commands.argument("players", EntityArgument.players())
+                            .executes((x) -> {
+                                try {
+                                    processor.startCloseup(x);
+                                } catch (SceneException e) {
+                                    x.getSource().sendFailure(Component.translatable(e.getMessage()));
+                                }
+                                return 0;
+                            }))));
+            origin.then(closeupStart);
+        }
+    }
+    
+    public static void quick(ArgumentBuilder<CommandSourceStack, ?> origin, CamCommandProcessor processor) {
+        if (!processor.supportsCloseup())
+            return;
+        quickCommand(origin, processor, "closeup", "closeup");
+        quickCommand(origin, processor, "shoulder", "shoulder");
+    }
+    
+    private static void quickCommand(ArgumentBuilder<CommandSourceStack, ?> origin, CamCommandProcessor processor, String literal, String modeId) {
+        ArgumentBuilder<CommandSourceStack, ?> cmd = Commands.literal(literal)
+            .requires(source -> source.hasPermission(2))
+            .then(Commands.argument("target", EntityArgument.entity())
+                .then(Commands.argument("players", EntityArgument.players())
+                    .executes(x -> executeQuick(x, processor, modeId, 8000L))
+                    .then(Commands.argument("duration", DurationArgument.duration())
+                        .executes(x -> executeQuick(x, processor, modeId, DurationArgument.getDuration(x, "duration"))))));
+        origin.then(cmd);
+    }
+    
+    private static int executeQuick(CommandContext<CommandSourceStack> x, CamCommandProcessor processor, String modeId, long duration) {
+        try {
+            processor.closeup(x, modeId, duration);
+        } catch (SceneException e) {
+            x.getSource().sendFailure(Component.translatable(e.getMessage()));
+        }
+        return 0;
     }
     
 }

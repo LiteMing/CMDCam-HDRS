@@ -28,6 +28,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent.Stage;
 import net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles;
@@ -38,6 +39,7 @@ import net.minecraftforge.event.TickEvent.RenderTickEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent.EntityInteract;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent.RightClickBlock;
+import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import team.creative.cmdcam.client.mixin.GameRendererAccessor;
 import team.creative.cmdcam.common.math.interpolation.CamInterpolation;
@@ -46,6 +48,7 @@ import team.creative.cmdcam.common.math.point.CamPoints;
 import team.creative.cmdcam.common.scene.CamScene;
 import team.creative.cmdcam.common.scene.attribute.CamAttribute;
 import team.creative.cmdcam.common.scene.mode.OutsideMode;
+import team.creative.cmdcam.common.scene.run.CamStopReason;
 import team.creative.cmdcam.common.target.CamTarget;
 import team.creative.creativecore.common.util.math.interpolation.Interpolation;
 import team.creative.creativecore.common.util.math.vec.Vec3d;
@@ -110,6 +113,10 @@ public class CamEventHandlerClient {
         CamEventHandlerClient.fov = fov;
     }
     
+    public static double fovOffset() {
+        return fov;
+    }
+    
     @SubscribeEvent
     public void onClientTick(ClientTickEvent event) {
         if (event.phase == Phase.END)
@@ -138,6 +145,7 @@ public class CamEventHandlerClient {
         if (MC.level == null) {
             CMDCamClient.resetServerAvailability();
             CMDCamClient.resetTargetMarker();
+            CMDCamClient.finishImmediately(CamStopReason.WORLD_UNLOAD);
         }
         if (event.phase == Phase.END)
             return;
@@ -366,6 +374,16 @@ public class CamEventHandlerClient {
     @SubscribeEvent
     public void cameraRoll(ComputeCameraAngles event) {
         event.setRoll(roll);
+    }
+    
+    @SubscribeEvent
+    public void onPlayerNetwork(ClientPlayerNetworkEvent event) {
+        CMDCamClient.finishImmediately(CamStopReason.DIMENSION_CHANGE);
+    }
+    
+    @SubscribeEvent
+    public void onLevelUnload(LevelEvent.Unload event) {
+        CMDCamClient.finishImmediately(CamStopReason.WORLD_UNLOAD);
     }
     
     @SubscribeEvent
