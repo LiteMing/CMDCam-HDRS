@@ -15,6 +15,8 @@ import net.minecraft.network.chat.Component;
 
 public class DurationArgument implements ArgumentType<Long> {
     
+    /** One Minecraft game tick in milliseconds (20 TPS). */
+    public static final long TICK_FACTOR = 50;
     public static final long SECOND_FACTOR = 1000;
     public static final long MINUTE_FACTOR = SECOND_FACTOR * 60;
     public static final long HOUR_FACTOR = MINUTE_FACTOR * 60;
@@ -52,7 +54,7 @@ public class DurationArgument implements ArgumentType<Long> {
         return output.substring(1); // Remove first space
     }
     
-    public static final List<String> EXAMPLES = Arrays.asList(new String[] { "10s", "30s", "1m", "500ms" });
+    public static final List<String> EXAMPLES = Arrays.asList(new String[] { "20", "10s", "30s", "1m", "500ms" });
     
     public static DurationArgument duration() {
         return new DurationArgument();
@@ -64,27 +66,30 @@ public class DurationArgument implements ArgumentType<Long> {
     
     @Override
     public Long parse(StringReader reader) throws CommandSyntaxException {
-        final int start = reader.getCursor();
         long time = reader.readLong();
-        String type = reader.readString();
-        long factor = 0;
-        if (type.equalsIgnoreCase("ms"))
-            factor = 1;
-        else if (type.equalsIgnoreCase("s"))
-            factor = SECOND_FACTOR;
-        else if (type.equalsIgnoreCase("m"))
-            factor = MINUTE_FACTOR;
-        else if (type.equalsIgnoreCase("h"))
-            factor = HOUR_FACTOR;
-        else if (type.equalsIgnoreCase("d"))
-            factor = DAY_FACTOR;
-        else {
-            reader.setCursor(start);
-            throw new CommandSyntaxException(new SimpleCommandExceptionType(new LiteralMessage("Invalid time format try out 10s (for 10 seconds)")), Component.translatable(
-                "invalid_time_format"));
+        // Peek at the next characters to determine the unit suffix.
+        // If none is present (end of input or non-letter char), default to ticks.
+        if (!reader.canRead() || !Character.isLetter(reader.peek())) {
+            // No suffix: treat the bare number as a tick count (1 tick = 50 ms at 20 TPS).
+            return time * TICK_FACTOR;
         }
-        
-        return time * factor;
+        String type = reader.readString();
+        if (type.equalsIgnoreCase("t") || type.equalsIgnoreCase("tick") || type.equalsIgnoreCase("ticks"))
+            return time * TICK_FACTOR;
+        if (type.equalsIgnoreCase("ms"))
+            return time;
+        if (type.equalsIgnoreCase("s"))
+            return time * SECOND_FACTOR;
+        if (type.equalsIgnoreCase("m") || type.equalsIgnoreCase("min"))
+            return time * MINUTE_FACTOR;
+        if (type.equalsIgnoreCase("h"))
+            return time * HOUR_FACTOR;
+        if (type.equalsIgnoreCase("d"))
+            return time * DAY_FACTOR;
+        // Unknown suffix – reject with a helpful message.
+        throw new CommandSyntaxException(
+            new SimpleCommandExceptionType(new LiteralMessage("Invalid time format. Examples: 20 (20 ticks), 10s, 500ms, 1m")),
+            Component.translatable("invalid_time_format"));
     }
     
     @Override

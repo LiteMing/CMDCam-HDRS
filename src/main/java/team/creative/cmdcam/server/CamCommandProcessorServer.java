@@ -102,9 +102,20 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
         runtimeOptions.modeId = CamPreset.TRACKING;
         
         CreativePacket packet = new StartCloseupPacket(runtime, target.getUUID(), CamPreset.TRACKING, runtimeOptions);
-        for (ServerPlayer player : players)
+        int sent = 0;
+        for (ServerPlayer player : players) {
+            if (!isCompatibleDimension(player, target)) {
+                context.getSource().sendFailure(Component.translatable("scene.closeup.wrong_dimension", player.getName()));
+                continue;
+            }
             CMDCam.NETWORK.sendToClient(packet, player);
-        final int count = players.size();
+            sent++;
+        }
+        if (sent == 0) {
+            context.getSource().sendFailure(Component.translatable("scene.closeup.no_compatible_players"));
+            return;
+        }
+        final int count = sent;
         context.getSource().sendSuccess(() -> Component.translatable("scene.tracking.started", name, count), true);
     }
     
@@ -129,10 +140,30 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
         runtimeOptions.modeId = preset.id;
         
         CreativePacket packet = new StartCloseupPacket(scene, target.getUUID(), preset.id, runtimeOptions);
-        for (ServerPlayer player : players)
+        int sent = 0;
+        for (ServerPlayer player : players) {
+            if (!isCompatibleDimension(player, target)) {
+                context.getSource().sendFailure(Component.translatable("scene.closeup.wrong_dimension", player.getName()));
+                continue;
+            }
             CMDCam.NETWORK.sendToClient(packet, player);
-        final int count = players.size();
+            sent++;
+        }
+        if (sent == 0) {
+            context.getSource().sendFailure(Component.translatable("scene.closeup.no_compatible_players"));
+            return;
+        }
+        final int count = sent;
         context.getSource().sendSuccess(() -> Component.translatable("scene.closeup.started", preset.id, count), true);
+    }
+
+    /**
+     * Returns {@code true} if the player is in the same dimension as the target.
+     * Tracking cameras depend on the client having the target entity in its entity list, which
+     * requires the same dimension. Cross-dimension support would need server-side pose sync.
+     */
+    private static boolean isCompatibleDimension(ServerPlayer player, Entity target) {
+        return player.serverLevel() == target.level();
     }
     
     private Entity resolveTarget(CommandContext<CommandSourceStack> context) {
@@ -154,18 +185,43 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
     
     @Override
     public void start(CommandContext<CommandSourceStack> context) throws SceneException {
-        CamScene scene = getScene(context);
-        if (scene == null) {
-            String name = StringArgumentType.getString(context, "name");
+        String name = StringArgumentType.getString(context, "name");
+        CamScene stored = CMDCamServer.get(context.getSource().getLevel(), name);
+        if (stored == null) {
             context.getSource().sendFailure(Component.translatable("scenes.load_fail", name));
             return;
         }
-        if (scene.points.isEmpty()) {
+        if (stored.points.isEmpty()) {
             context.getSource().sendFailure(Component.translatable("scene.create_fail"));
             return;
         }
-        CreativePacket packet = new StartPathPacket(scene);
-        for (ServerPlayer player : getPlayers(context))
+        Collection<ServerPlayer> players = getPlayers(context);
+        CreativePacket packet = new StartPathPacket(stored);
+        for (ServerPlayer player : players)
+            CMDCam.NETWORK.sendToClient(packet, player);
+    }
+
+    @Override
+    public void startPath(CommandContext<CommandSourceStack> context, Long durationOverride, Integer loopOverride) throws SceneException {
+        String name = StringArgumentType.getString(context, "name");
+        CamScene stored = CMDCamServer.get(context.getSource().getLevel(), name);
+        if (stored == null) {
+            context.getSource().sendFailure(Component.translatable("scenes.load_fail", name));
+            return;
+        }
+        if (stored.points.isEmpty()) {
+            context.getSource().sendFailure(Component.translatable("scene.create_fail"));
+            return;
+        }
+        // Apply one-shot overrides on a *copy* so the saved scene is never mutated.
+        CamScene runtime = stored.copy();
+        if (durationOverride != null && durationOverride > 0)
+            runtime.duration = durationOverride;
+        if (loopOverride != null)
+            runtime.loop = loopOverride;
+        Collection<ServerPlayer> players = getPlayers(context);
+        CreativePacket packet = new StartPathPacket(runtime);
+        for (ServerPlayer player : players)
             CMDCam.NETWORK.sendToClient(packet, player);
     }
     

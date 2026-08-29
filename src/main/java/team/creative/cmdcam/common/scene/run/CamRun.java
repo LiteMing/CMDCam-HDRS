@@ -9,6 +9,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import team.creative.cmdcam.CMDCam;
 import team.creative.cmdcam.client.CMDCamClient;
 import team.creative.cmdcam.client.SceneException;
 import team.creative.cmdcam.common.math.interpolation.CamInterpolation;
@@ -52,14 +53,22 @@ public class CamRun {
         if (scene.smoothBeginning) { // Smooth start from current player position
             CamPoints points = new CamPoints();
             CamPoint camPoint = CamPoint.create(camera);
+            boolean smoothOk = true;
             try {
                 CMDCamClient.PROCESSOR.makeRelative(scene, level, camPoint);
-            } catch (SceneException e) {}
-            points.add(camPoint);
-            points.add(scene.points.get(0).copy());
-            points.after(scene.points.get(0).copy());
-            points.fixSpinning(CamPitchMode.FIX);
-            stages.add(new CamRunStage(this, CamInterpolation.HERMITE, (long) Mth.clampedLerp(points.estimateLength() / 10, 1000, 20000), 0, points));
+            } catch (SceneException e) {
+                // Target not yet loaded: skip the smooth entry rather than inserting
+                // an absolute world-coordinate point that would be misread as a local offset.
+                CMDCam.LOGGER.warn("CMDCam: smooth start skipped because target pose is unavailable ({})", e.getMessage());
+                smoothOk = false;
+            }
+            if (smoothOk) {
+                points.add(camPoint);
+                points.add(scene.points.get(0).copy());
+                points.after(scene.points.get(0).copy());
+                points.fixSpinning(CamPitchMode.FIX);
+                stages.add(new CamRunStage(this, CamInterpolation.HERMITE, (long) Mth.clampedLerp(points.estimateLength() / 10, 1000, 20000), 0, points));
+            }
         }
         
         { // First sequence
@@ -148,6 +157,9 @@ public class CamRun {
                     stage.start();
                     time = 0;
                 } else {
+                    // Natural playback end: record reason before finishing so callers can inspect it.
+                    if (stopReason == null)
+                        stopReason = CamStopReason.NATURAL_END;
                     scene.finish(level);
                     return;
                 }

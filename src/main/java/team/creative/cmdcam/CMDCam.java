@@ -83,11 +83,12 @@ public class CMDCam {
         NETWORK.registerType(GetPathPacket.class, GetPathPacket::new);
         NETWORK.registerType(SetPathPacket.class, SetPathPacket::new);
         NETWORK.registerType(StartPathPacket.class, StartPathPacket::new);
-        NETWORK.registerType(StartCloseupPacket.class, StartCloseupPacket::new);
         NETWORK.registerType(StopPathPacket.class, StopPathPacket::new);
         NETWORK.registerType(TeleportPathPacket.class, TeleportPathPacket::new);
         NETWORK.registerType(PausePathPacket.class, PausePathPacket::new);
         NETWORK.registerType(ResumePathPacket.class, ResumePathPacket::new);
+        // New packets must always be appended at the end to preserve protocol discriminator IDs.
+        NETWORK.registerType(StartCloseupPacket.class, StartCloseupPacket::new);
         
         MinecraftForge.EVENT_BUS.register(new CamEventHandler());
         
@@ -95,7 +96,8 @@ public class CMDCam {
     }
     
     private void commands(final RegisterCommandsEvent event) {
-        LiteralArgumentBuilder<CommandSourceStack> camServer = Commands.literal("cam-server");
+        LiteralArgumentBuilder<CommandSourceStack> camServer = Commands.literal("cam-server")
+            .requires(source -> source.hasPermission(2));
         
         SceneStartCommandBuilder.start(camServer, CMDCamServer.PROCESSOR);
         SceneStartCommandBuilder.quick(camServer, CMDCamServer.PROCESSOR);

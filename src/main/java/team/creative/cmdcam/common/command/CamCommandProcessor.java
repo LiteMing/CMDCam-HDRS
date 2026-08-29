@@ -81,6 +81,18 @@ public interface CamCommandProcessor {
         start(context);
     }
     
+    /**
+     * Plays a saved path with one-shot duration/loop overrides that apply only to this run.
+     * The saved scene must not be modified; the processor is responsible for working on a copy.
+     *
+     * @param durationOverride milliseconds, or {@code null} to keep the scene default
+     * @param loopOverride     loop count, or {@code null} to keep the scene default
+     */
+    public default void startPath(CommandContext<CommandSourceStack> context, Long durationOverride, Integer loopOverride) throws SceneException {
+        startPath(context);
+    }
+
+    
     /** Binds the control points of a saved path to an entity. */
     public default void startTracking(CommandContext<CommandSourceStack> context, TrackingOptions options, long durationMs) throws SceneException {}
     

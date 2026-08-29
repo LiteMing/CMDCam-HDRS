@@ -43,7 +43,7 @@ public class SceneStartCommandBuilder {
         
         // start path <scene> <players> [duration] [loop]
         ArgumentBuilder<CommandSourceStack, ?> pathName = Commands.argument("name", StringArgumentType.string());
-        pathName.then(durationLoop(Commands.argument("players", EntityArgument.players()), processor, false, x -> processor.startPath(x)));
+        pathName.then(durationLoop(Commands.argument("players", EntityArgument.players()), processor, false, x -> processor.startPath(x, optional(x, "duration", long.class), optional(x, "loop", Integer.class))));
         start.then(Commands.literal("path").then(pathName));
         
         // start tracking <scene> <target> <players> [duration] [distance_scale] [fov] [damping] [pitch_follow]
@@ -79,49 +79,41 @@ public class SceneStartCommandBuilder {
         
         // deprecated: play <scene> <players> [duration] [loop], replaced by start path
         ArgumentBuilder<CommandSourceStack, ?> playName = Commands.argument("name", StringArgumentType.string());
-        playName.then(durationLoop(Commands.argument("players", EntityArgument.players()), processor, true, x -> processor.startPath(x)));
+        playName.then(durationLoop(Commands.argument("players", EntityArgument.players()), processor, true,
+            x -> processor.startPath(x, optional(x, "duration", long.class), optional(x, "loop", Integer.class))));
         origin.then(Commands.literal("play").then(playName));
     }
     
-    /** Deprecated top level shortcuts for the two built in presets. */
+    /**
+     * Shortcut top-level commands for the two built in presets.
+     * Supports the full optional parameter chain: [duration] [distance] [fov] [damping] [pitch_follow]
+     */
     public static void quick(ArgumentBuilder<CommandSourceStack, ?> origin, CamCommandProcessor processor) {
         if (!processor.supportsCloseup())
             return;
-        for (String id : PRESETS)
-            origin.then(Commands.literal(id).requires(PERMISSION_2)
-                .then(Commands.argument("target", EntityArgument.entity())
-                    .then(Commands.argument("players", EntityArgument.players())
-                        .executes(x -> quickPreset(x, processor, id, DEFAULT_PRESET_DURATION))
-                        .then(Commands.argument("duration", DurationArgument.duration())
-                            .executes(x -> quickPreset(x, processor, id, durationOr(x, DEFAULT_PRESET_DURATION)))))));
+        for (String id : PRESETS) {
+            ArgumentBuilder<CommandSourceStack, ?> quickTarget = Commands.argument("target", EntityArgument.entity());
+            quickTarget.then(options(Commands.argument("players", EntityArgument.players()), processor, id, true));
+            origin.then(Commands.literal(id).requires(PERMISSION_2).then(quickTarget));
+        }
     }
     
     private static ArgumentBuilder<CommandSourceStack, ?> durationLoop(ArgumentBuilder<CommandSourceStack, ?> node, CamCommandProcessor processor,
             boolean deprecated, SceneStarter starter) {
-        node.executes(x -> runDurationLoop(x, processor, deprecated, starter));
+        node.executes(x -> runDurationLoop(x, deprecated, starter));
         node.then(Commands.argument("duration", DurationArgument.duration())
-            .executes(x -> runDurationLoop(x, processor, deprecated, starter))
+            .executes(x -> runDurationLoop(x, deprecated, starter))
             .then(Commands.argument("loop", IntegerArgumentType.integer(-1))
-                .executes(x -> runDurationLoop(x, processor, deprecated, starter))));
+                .executes(x -> runDurationLoop(x, deprecated, starter))));
         return node;
     }
     
-    private static int runDurationLoop(CommandContext<CommandSourceStack> x, CamCommandProcessor processor, boolean deprecated, SceneStarter starter) {
+    private static int runDurationLoop(CommandContext<CommandSourceStack> x, boolean deprecated, SceneStarter starter) {
         try {
             if (deprecated)
                 warnDeprecated(x);
-            
-            Long duration = optional(x, "duration", long.class);
-            if (duration != null && duration > 0) {
-                processor.getScene(x).duration = duration;
-                processor.markDirty(x);
-            }
-            Integer loop = optional(x, "loop", Integer.class);
-            if (loop != null) {
-                processor.getScene(x).loop = loop;
-                processor.markDirty(x);
-            }
-            
+            // Overrides are passed to the processor; the processor must apply them to a *copy*
+            // of the saved scene so the stored template is never mutated by a play command.
             starter.start(x);
         } catch (SceneException e) {
             x.getSource().sendFailure(e.getComponent());
@@ -150,18 +142,6 @@ public class SceneStartCommandBuilder {
             TrackingOptions options = readOptions(x, modeId, absoluteDistance);
             options.validate();
             starter.start(x, options, durationOr(x, 0L));
-        } catch (SceneException e) {
-            x.getSource().sendFailure(e.getComponent());
-        }
-        return 0;
-    }
-    
-    private static int quickPreset(CommandContext<CommandSourceStack> x, CamCommandProcessor processor, String presetId, long duration) {
-        try {
-            warnDeprecated(x);
-            TrackingOptions options = new TrackingOptions(presetId);
-            options.validate();
-            processor.startPreset(x, options, duration > 0 ? duration : DEFAULT_PRESET_DURATION);
         } catch (SceneException e) {
             x.getSource().sendFailure(e.getComponent());
         }

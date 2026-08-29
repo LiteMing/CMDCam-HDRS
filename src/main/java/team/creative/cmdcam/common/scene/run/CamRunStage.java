@@ -66,6 +66,16 @@ public class CamRunStage {
         if (run.scene.posTarget != null)
             addFollow(CamAttribute.POSITION, run.scene.posFollowConfig, initial);
         
+        // Second-layer defence: seed lastTrackedPoint with the camera's current world position
+        // so that if tracking.calculate() returns null on the first few frames, the camera stays
+        // put rather than jumping to the local control-point coordinates (e.g. x=0, y=0.1, z=-1.5)
+        // interpreted as world coordinates.
+        if (run.scene.tracking) {
+            Entity camera = run.scene.mode.getCamera();
+            if (camera != null)
+                lastTrackedPoint = CamPoint.create(camera);
+        }
+        
         started = true;
     }
     
