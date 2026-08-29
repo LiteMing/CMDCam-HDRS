@@ -100,18 +100,24 @@ public class TrackingOptions {
         return returnDurationMs >= MIN_RETURN_DURATION_MS && returnDurationMs <= MAX_RETURN_DURATION_MS ? returnDurationMs : fallback;
     }
     
-    /** Rejects out of range values instead of silently clamping them. */
+    private static boolean invalid(Double value, double min, double max) {
+        return value != null && (!Double.isFinite(value) || value < min || value > max);
+    }
+    
+    /** Rejects out of range values or non-finite numbers (NaN, Infinity) instead of silently clamping them. */
     public void validate() throws SceneException {
-        if (distance != null && (distance < MIN_DISTANCE || distance > MAX_DISTANCE))
+        if (invalid(distance, MIN_DISTANCE, MAX_DISTANCE))
             throw new SceneException("scene.tracking.invalid_distance", MIN_DISTANCE, MAX_DISTANCE);
-        if (distanceScale != null && (distanceScale < MIN_DISTANCE_SCALE || distanceScale > MAX_DISTANCE_SCALE))
+        if (invalid(distanceScale, MIN_DISTANCE_SCALE, MAX_DISTANCE_SCALE))
             throw new SceneException("scene.tracking.invalid_distance_scale", MIN_DISTANCE_SCALE, MAX_DISTANCE_SCALE);
-        if (fov != null && (fov < MIN_FOV || fov > MAX_FOV))
+        if (invalid(fov, MIN_FOV, MAX_FOV))
             throw new SceneException("scene.tracking.invalid_fov", MIN_FOV, MAX_FOV);
-        if (dampingMs != null && (dampingMs < MIN_DAMPING_MS || dampingMs > MAX_DAMPING_MS))
+        if (invalid(dampingMs, MIN_DAMPING_MS, MAX_DAMPING_MS))
             throw new SceneException("scene.tracking.invalid_damping", MIN_DAMPING_MS, MAX_DAMPING_MS);
-        if (pitchFollow != null && (pitchFollow < MIN_PITCH_FOLLOW || pitchFollow > MAX_PITCH_FOLLOW))
+        if (invalid(pitchFollow, MIN_PITCH_FOLLOW, MAX_PITCH_FOLLOW))
             throw new SceneException("scene.tracking.invalid_pitch_follow", MIN_PITCH_FOLLOW, MAX_PITCH_FOLLOW);
+        if (invalid(targetHeightFactor, 0.0D, 1.0D))
+            throw new SceneException("scene.tracking.invalid_pitch_follow", 0.0D, 1.0D);
     }
     
     public CompoundTag save(CompoundTag nbt) {

@@ -1,9 +1,11 @@
 package team.creative.cmdcam.common.command.argument;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
@@ -30,8 +32,8 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
         key -> new LiteralMessage("Duplicate option: '" + key + "'"));
     private static final SimpleCommandExceptionType EXPECTED_EQUALS = new SimpleCommandExceptionType(
         new LiteralMessage("Expected '=' after option key"));
-    private static final DynamicCommandExceptionType INVALID_VALUE = new DynamicCommandExceptionType(
-        msg -> new LiteralMessage("Invalid option value: " + msg));
+    private static final SimpleCommandExceptionType INVALID_OPTION = new SimpleCommandExceptionType(
+        new LiteralMessage("Invalid option"));
     
     private static final List<String> PRESET_KEYS = Arrays.asList(
         "duration", "distance", "fov", "damping", "pitch_follow"
@@ -86,7 +88,7 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
             while (reader.canRead() && reader.peek() != '=' && !Character.isWhitespace(reader.peek())) {
                 reader.skip();
             }
-            String key = reader.getString().substring(keyStart, reader.getCursor()).toLowerCase();
+            String key = reader.getString().substring(keyStart, reader.getCursor()).toLowerCase(Locale.ROOT);
             
             if (key.isEmpty())
                 break;
@@ -140,7 +142,7 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
         try {
             options.validate();
         } catch (SceneException e) {
-            throw INVALID_VALUE.create(e.getMessage());
+            throw new CommandSyntaxException(INVALID_OPTION, e.getComponent());
         }
         
         return new ParsedOptions(options, durationMs);
@@ -150,57 +152,57 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder) {
         String remaining = builder.getRemaining();
         
-        Set<String> presentKeys = new HashSet<>();
-        String[] parts = remaining.split("\\s+");
-        String currentToken = "";
-        if (remaining.endsWith(" ") || remaining.isEmpty()) {
-            for (String part : parts) {
-                int eq = part.indexOf('=');
-                if (eq > 0)
-                    presentKeys.add(part.substring(0, eq).toLowerCase());
-            }
-        } else {
-            for (int i = 0; i < parts.length - 1; i++) {
-                int eq = parts[i].indexOf('=');
-                if (eq > 0)
-                    presentKeys.add(parts[i].substring(0, eq).toLowerCase());
-            }
-            currentToken = parts[parts.length - 1];
+        int tokenStart = remaining.length();
+        while (tokenStart > 0 && !Character.isWhitespace(remaining.charAt(tokenStart - 1))) {
+            tokenStart--;
         }
         
-        List<String> allowed = getAllowedKeys();
+        String completedPart = remaining.substring(0, tokenStart).trim();
+        String currentToken = remaining.substring(tokenStart);
+        
+        Set<String> presentKeys = new HashSet<>();
+        if (!completedPart.isEmpty()) {
+            for (String part : completedPart.split("\\s+")) {
+                int eq = part.indexOf('=');
+                if (eq > 0)
+                    presentKeys.add(part.substring(0, eq).toLowerCase(Locale.ROOT));
+            }
+        }
+        
+        SuggestionsBuilder currentBuilder = builder.createOffset(builder.getStart() + tokenStart);
         
         if (currentToken.contains("=")) {
             int eqIdx = currentToken.indexOf('=');
-            String key = currentToken.substring(0, eqIdx).toLowerCase();
+            String key = currentToken.substring(0, eqIdx).toLowerCase(Locale.ROOT);
             String prefix = currentToken.substring(0, eqIdx + 1);
             if ("duration".equals(key)) {
                 List<String> examples = Arrays.asList(prefix + "160t", prefix + "8s", prefix + "5000ms");
-                return SharedSuggestionProvider.suggest(examples, builder);
+                return SharedSuggestionProvider.suggest(examples, currentBuilder);
             } else if ("fov".equals(key)) {
                 List<String> examples = Arrays.asList(prefix + "30", prefix + "50", prefix + "70", prefix + "90");
-                return SharedSuggestionProvider.suggest(examples, builder);
+                return SharedSuggestionProvider.suggest(examples, currentBuilder);
             } else if ("distance".equals(key) || "distance_scale".equals(key)) {
                 List<String> examples = Arrays.asList(prefix + "1.5", prefix + "2.0", prefix + "3.0");
-                return SharedSuggestionProvider.suggest(examples, builder);
+                return SharedSuggestionProvider.suggest(examples, currentBuilder);
             } else if ("damping".equals(key)) {
                 List<String> examples = Arrays.asList(prefix + "0", prefix + "250", prefix + "500");
-                return SharedSuggestionProvider.suggest(examples, builder);
+                return SharedSuggestionProvider.suggest(examples, currentBuilder);
             } else if ("pitch_follow".equals(key)) {
                 List<String> examples = Arrays.asList(prefix + "0.0", prefix + "0.5", prefix + "1.0");
-                return SharedSuggestionProvider.suggest(examples, builder);
+                return SharedSuggestionProvider.suggest(examples, currentBuilder);
             }
             return Suggestions.empty();
         }
         
-        List<String> candidates = new java.util.ArrayList<>();
+        List<String> allowed = getAllowedKeys();
+        List<String> candidates = new ArrayList<>();
         for (String k : allowed) {
             if (!presentKeys.contains(k)) {
                 candidates.add(k + "=");
             }
         }
         
-        return SharedSuggestionProvider.suggest(candidates, builder);
+        return SharedSuggestionProvider.suggest(candidates, currentBuilder);
     }
     
     @Override
