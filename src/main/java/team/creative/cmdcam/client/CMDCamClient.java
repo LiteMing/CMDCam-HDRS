@@ -258,6 +258,7 @@ public class CMDCamClient {
      * call {@link #finishImmediately} themselves before calling this method.
      */
     public static void start(CamScene scene) {
+        CamFadeController.reset();
         cancelPendingStart();
         if (playing != null)
             finishImmediately(CamStopReason.OVERWRITE);
@@ -278,6 +279,7 @@ public class CMDCamClient {
      */
     public static void startCloseup(CamScene scene) {
         // Cancel whatever is already going on before entering pending state.
+        CamFadeController.reset();
         cancelPendingStart();
         if (playing != null)
             finishImmediately(CamStopReason.OVERWRITE);
@@ -296,7 +298,7 @@ public class CMDCamClient {
         if (scene.trackingOptions != null && scene.trackingOptions.enterStyle == team.creative.cmdcam.common.scene.tracking.CamTransitionStyle.FADE) {
             long duration = scene.trackingOptions.enterDurationOrDefault(750L);
             int color = scene.trackingOptions.fadeColorOrDefault(0x000000);
-            CamFadeController.startFullTransition(duration, color, () -> startNow(scene), null);
+            CamFadeController.startFullTransition(CamFadeController.Purpose.ENTER, duration, color, () -> startNow(scene), null);
             return;
         }
         
@@ -339,9 +341,11 @@ public class CMDCamClient {
                 finishImmediately(reason);
                 return;
             case FADE:
+                if (CamFadeController.isExiting())
+                    return;
                 long duration = playing.trackingOptions.returnDurationOrDefault(750L);
                 int color = playing.trackingOptions.fadeColorOrDefault(0x000000);
-                CamFadeController.startFullTransition(duration, color, () -> finishImmediately(reason, false), null);
+                CamFadeController.startFullTransition(CamFadeController.Purpose.EXIT, duration, color, () -> finishImmediately(reason, false), null);
                 return;
             case SMOOTH:
             default:
@@ -403,8 +407,10 @@ public class CMDCamClient {
     /** Stops a locally started (non-server-synced) scene. Also cancels any pending start. */
     public static void stop() {
         cancelPendingStart();
-        if (playing == null)
+        if (playing == null) {
+            CamFadeController.cancelEnterTransition();
             return;
+        }
         if (playing.serverSynced())
             return;
         requestStop(CamStopReason.COMMAND_STOP);
@@ -413,8 +419,10 @@ public class CMDCamClient {
     /** Stops the current scene on a server-stop command. Also cancels any pending start. */
     public static void stopServer() {
         cancelPendingStart();
-        if (playing == null)
+        if (playing == null) {
+            CamFadeController.cancelEnterTransition();
             return;
+        }
         requestStop(CamStopReason.COMMAND_STOP);
     }
     

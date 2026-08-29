@@ -159,8 +159,12 @@ public class CamEventHandlerClient {
             CMDCamClient.resetTargetMarker();
             CMDCamClient.finishImmediately(CamStopReason.WORLD_UNLOAD);
         }
-        if (event.phase == Phase.END)
+        if (event.phase == Phase.END) {
+            if (CamFadeController.isActive()) {
+                CamFadeController.renderDirect(MC.getWindow().getGuiScaledWidth(), MC.getWindow().getGuiScaledHeight());
+            }
             return;
+        }
         
         renderingHand = false;
         
@@ -398,11 +402,13 @@ public class CamEventHandlerClient {
     
     @SubscribeEvent
     public void onPlayerNetwork(ClientPlayerNetworkEvent event) {
+        CamFadeController.reset();
         CMDCamClient.finishImmediately(CamStopReason.DIMENSION_CHANGE);
     }
     
     @SubscribeEvent
     public void onLevelUnload(LevelEvent.Unload event) {
+        CamFadeController.reset();
         CMDCamClient.finishImmediately(CamStopReason.WORLD_UNLOAD);
     }
     

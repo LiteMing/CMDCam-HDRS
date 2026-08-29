@@ -131,7 +131,7 @@ public class CamRun {
         }
         
         boolean smoothExit = scene.tracking && scene.targetReturnDuration > 0 && camera != null;
-        if (scene.trackingOptions != null && scene.trackingOptions.exitStyle == team.creative.cmdcam.common.scene.tracking.CamTransitionStyle.CUT)
+        if (scene.trackingOptions != null && scene.trackingOptions.exitStyle != team.creative.cmdcam.common.scene.tracking.CamTransitionStyle.SMOOTH)
             smoothExit = false;
         if (smoothExit) {
             CamPoints points = new CamPoints();
@@ -150,6 +150,9 @@ public class CamRun {
     }
     
     public void renderTick(Level level, float deltaTime) {
+        if (finished || currentStage >= stages.size())
+            return;
+        
         if (returnRequested && returnStageIndex >= 0) {
             returnRequested = false;
             returning = true;
@@ -180,9 +183,14 @@ public class CamRun {
                     time = 0;
                 } else {
                     // All stages (including the return stage) have finished.
-                    if (!exitDispatched) {
+                    finished = true;
+                    running = false;
+                    CamStopReason finalReason = stopReason != null ? stopReason : CamStopReason.NATURAL_END;
+                    if (isReturning()) {
+                        CMDCamClient.finishImmediately(finalReason);
+                    } else if (!exitDispatched) {
                         exitDispatched = true;
-                        CMDCamClient.requestStop(CamStopReason.NATURAL_END);
+                        CMDCamClient.requestStop(finalReason);
                     }
                     return;
                 }
