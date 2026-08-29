@@ -215,17 +215,25 @@ public class CMDCamClient {
         if (current == null)
             return;
         
+        boolean cleanupCompleted = false;
         try {
             current.finish(mc.level);
+            cleanupCompleted = true;
+        } catch (RuntimeException e) {
+            CMDCam.LOGGER.error("Failed to clean up camera, reason={}", reason, e);
         } finally {
             playing = null;
             mc.options.hideGui = hideGuiCache;
             
-            if (mc.player != null)
+            if (mc.player != null && mc.cameraEntity == null)
                 mc.cameraEntity = mc.player;
             
-            CamEventHandlerClient.resetFOV();
-            CamEventHandlerClient.resetRoll();
+            if (!cleanupCompleted) {
+                CamEventHandlerClient.resetFOV();
+                CamEventHandlerClient.resetRoll();
+                if (mc.player != null)
+                    mc.cameraEntity = mc.player;
+            }
         }
     }
     

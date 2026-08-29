@@ -32,7 +32,7 @@ public class DefaultMode extends CamMode {
     public void finished(CamRun run) {
         super.finished(run);
         Minecraft mc = Minecraft.getInstance();
-        if (!mc.player.isCreative())
+        if (mc.player != null && !mc.player.isCreative())
             mc.player.getAbilities().flying = false;
     }
     

@@ -34,7 +34,9 @@ public class OutsideMode extends CamMode {
     public void finished(CamRun run) {
         super.finished(run);
         Minecraft mc = Minecraft.getInstance();
-        mc.cameraEntity = mc.player;
+        if (mc.player != null)
+            mc.cameraEntity = mc.player;
+        camPlayer = null;
     }
     
     @Override

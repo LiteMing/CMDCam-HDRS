@@ -199,9 +199,7 @@ public class CamScene {
         
         stop();
         if (run != null) {
-            if (level != null && level.isClientSide)
-                mode.finished(run);
-            else if (mode != null)
+            if (mode != null)
                 mode.finished(run);
             run.finish();
             run = null;

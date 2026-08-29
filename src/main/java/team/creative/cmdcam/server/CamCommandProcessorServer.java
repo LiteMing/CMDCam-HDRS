@@ -91,9 +91,8 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
             return;
         }
         CamScene runtime = scene.copy();
-        runtime.setMode("closeup");
         double heightFactor = 0.78D;
-        CreativePacket packet = new StartCloseupPacket(runtime, target.getUUID(), 750L, heightFactor);
+        CreativePacket packet = new StartCloseupPacket(runtime, target.getUUID(), 750L, heightFactor, "closeup");
         for (ServerPlayer player : players)
             CMDCam.NETWORK.sendToClient(packet, player);
         final int count = players.size();
@@ -116,7 +115,6 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
         }
         CamScene scene = CamScene.createDefault();
         scene.duration = duration;
-        scene.setMode(mode);
         
         Vec3d off;
         float fov;
@@ -132,7 +130,7 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
         }
         scene.points.add(new CamPoint(off.x, off.y, off.z, 0, 0, 0, fov));
         
-        CreativePacket packet = new StartCloseupPacket(scene, target.getUUID(), 750L, heightFactor);
+        CreativePacket packet = new StartCloseupPacket(scene, target.getUUID(), 750L, heightFactor, mode);
         for (ServerPlayer player : players)
             CMDCam.NETWORK.sendToClient(packet, player);
         final int count = players.size();

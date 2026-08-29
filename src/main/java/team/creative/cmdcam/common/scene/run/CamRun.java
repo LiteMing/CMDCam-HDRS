@@ -187,6 +187,10 @@ public class CamRun {
         }
     }
     
+    public CamStopReason stopReason() {
+        return stopReason;
+    }
+    
     public CamAttribute[] attributes() {
         return PATH_ATTRIBUTES;
     }
