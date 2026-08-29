@@ -32,6 +32,7 @@ import team.creative.cmdcam.common.command.argument.CamPitchModeArgument;
 import team.creative.cmdcam.common.command.argument.DurationArgument;
 import team.creative.cmdcam.common.command.argument.InterpolationArgument;
 import team.creative.cmdcam.common.command.argument.InterpolationArgument.AllInterpolationArgument;
+import team.creative.cmdcam.common.command.argument.TrackingOptionsArgument;
 import team.creative.cmdcam.common.command.builder.SceneCommandBuilder;
 import team.creative.cmdcam.common.command.builder.SceneStartCommandBuilder;
 import team.creative.cmdcam.common.packet.ConnectPacket;
@@ -76,6 +77,8 @@ public class CMDCam {
                 .<AllInterpolationArgument>contextFree(() -> InterpolationArgument.interpolationAll())));
         COMMAND_ARGUMENT_TYPES.register("pitch_mode", () -> ArgumentTypeInfos.registerByClass(CamPitchModeArgument.class, SingletonArgumentInfo.<CamPitchModeArgument>contextFree(
             () -> CamPitchModeArgument.pitchMode())));
+        COMMAND_ARGUMENT_TYPES.register("tracking_options", () -> ArgumentTypeInfos.registerByClass(TrackingOptionsArgument.class, SingletonArgumentInfo.<TrackingOptionsArgument>contextFree(
+            () -> TrackingOptionsArgument.preset("closeup"))));
     }
     
     private void init(final FMLCommonSetupEvent event) {
