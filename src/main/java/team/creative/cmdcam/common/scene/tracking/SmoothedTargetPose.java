@@ -19,7 +19,8 @@ public class SmoothedTargetPose {
     private double x;
     private double y;
     private double z;
-    private float yaw;
+    private float bodyYaw;
+    private float viewYaw;
     private float pitch;
     
     private boolean initialized;
@@ -69,7 +70,8 @@ public class SmoothedTargetPose {
             x = target.eyePosition.x;
             y = target.eyePosition.y;
             z = target.eyePosition.z;
-            yaw = target.bodyYaw;
+            bodyYaw = target.bodyYaw;
+            viewYaw = target.viewYaw;
             pitch = target.pitch;
             return current(target);
         }
@@ -81,14 +83,15 @@ public class SmoothedTargetPose {
         x = Mth.lerp(alpha, x, target.eyePosition.x);
         y = Mth.lerp(alpha, y, target.eyePosition.y);
         z = Mth.lerp(alpha, z, target.eyePosition.z);
-        yaw = Mth.rotLerp((float) alpha, yaw, target.bodyYaw);
+        bodyYaw = Mth.rotLerp((float) alpha, bodyYaw, target.bodyYaw);
+        viewYaw = Mth.rotLerp((float) alpha, viewYaw, target.viewYaw);
         pitch = Mth.rotLerp((float) alpha, pitch, target.pitch);
         
         return current(target);
     }
     
     private CamTargetPose current(CamTargetPose sample) {
-        return new CamTargetPose(new Vec3d(x, y, z), sample.bbHeight, sample.eyeHeight, yaw, pitch);
+        return new CamTargetPose(new Vec3d(x, y, z), sample.bbHeight, sample.eyeHeight, bodyYaw, viewYaw, pitch);
     }
     
 }

@@ -9,6 +9,7 @@ public class CamTargetPose {
     public final double bbHeight;
     public final double eyeHeight;
     public final float bodyYaw;
+    public final float viewYaw;
     public final float pitch;
     public final boolean valid;
     
@@ -17,21 +18,37 @@ public class CamTargetPose {
         this.bbHeight = 0;
         this.eyeHeight = 0;
         this.bodyYaw = 0;
+        this.viewYaw = 0;
         this.pitch = 0;
         this.valid = false;
     }
     
-    public CamTargetPose(Vec3d eyePosition, double bbHeight, double eyeHeight, float bodyYaw, float pitch) {
+    public CamTargetPose(Vec3d eyePosition, double bbHeight, double eyeHeight, float bodyYaw, float viewYaw, float pitch) {
         this.eyePosition = eyePosition;
         this.bbHeight = bbHeight;
         this.eyeHeight = eyeHeight;
         this.bodyYaw = bodyYaw;
+        this.viewYaw = viewYaw;
         this.pitch = pitch;
         this.valid = true;
     }
     
+    /** Backward compatibility constructor setting viewYaw = bodyYaw. */
+    public CamTargetPose(Vec3d eyePosition, double bbHeight, double eyeHeight, float yaw, float pitch) {
+        this(eyePosition, bbHeight, eyeHeight, yaw, yaw, pitch);
+    }
+    
     public static CamTargetPose invalid() {
         return new CamTargetPose();
+    }
+    
+    /**
+     * Blends bodyYaw and viewYaw using shortest angular distance.
+     * @param yawFollow 0.0 = full body, 1.0 = full view/head, 0.75 = mostly head with body stability.
+     */
+    public float blendYaw(double yawFollow) {
+        float headDelta = Mth.wrapDegrees(viewYaw - bodyYaw);
+        return Mth.wrapDegrees(bodyYaw + headDelta * (float) Mth.clamp(yawFollow, 0.0D, 1.0D));
     }
     
     public Vec3d anchor(double heightFactor) {

@@ -47,22 +47,27 @@ public abstract class CamTarget {
         Vec3d pos = position(level, partialTicks);
         if (pos == null)
             return CamTargetPose.invalid();
-        return new CamTargetPose(pos, 0, 0, 0f, 0f);
+        return new CamTargetPose(pos, 0, 0, 0f, 0f, 0f);
     }
     
     protected static CamTargetPose poseOf(Entity entity, float partialTicks) {
         if (entity == null || !entity.isAlive())
             return CamTargetPose.invalid();
         Vec3 eye = entity.getEyePosition(partialTicks);
-        float yaw;
-        if (entity instanceof LivingEntity living)
-            yaw = Mth.rotLerp(partialTicks, living.yBodyRotO, living.yBodyRot);
-        else
-            yaw = Mth.rotLerp(partialTicks, entity.yRotO, entity.getYRot());
-        if (Float.isNaN(yaw))
-            yaw = Mth.rotLerp(partialTicks, entity.yRotO, entity.getYRot());
+        float bodyYaw;
+        float viewYaw;
+        if (entity instanceof LivingEntity living) {
+            bodyYaw = Mth.rotLerp(partialTicks, living.yBodyRotO, living.yBodyRot);
+            viewYaw = Mth.rotLerp(partialTicks, living.yHeadRotO, living.yHeadRot);
+        } else {
+            bodyYaw = viewYaw = Mth.rotLerp(partialTicks, entity.yRotO, entity.getYRot());
+        }
+        if (!Float.isFinite(bodyYaw))
+            bodyYaw = Mth.rotLerp(partialTicks, entity.yRotO, entity.getYRot());
+        if (!Float.isFinite(viewYaw))
+            viewYaw = bodyYaw;
         float pitch = Mth.rotLerp(partialTicks, entity.xRotO, entity.getXRot());
-        return new CamTargetPose(new Vec3d(eye), entity.getBbHeight(), entity.getEyeHeight(), yaw, pitch);
+        return new CamTargetPose(new Vec3d(eye), entity.getBbHeight(), entity.getEyeHeight(), bodyYaw, viewYaw, pitch);
     }
     
     protected abstract void saveExtra(CompoundTag nbt);

@@ -37,6 +37,7 @@ public abstract class TrackingMode extends OutsideMode {
     public double defaultDistance = 1.6;
     public double defaultDampingMs = 300;
     public double defaultPitchFollow = 0.5;
+    public double defaultYawFollow = 1.0;
     
     public Entity cameraEntityBefore;
     public CameraType cameraTypeBefore;
@@ -58,6 +59,7 @@ public abstract class TrackingMode extends OutsideMode {
         this.defaultDistance = preset.distance;
         this.defaultDampingMs = preset.dampingMs;
         this.defaultPitchFollow = preset.pitchFollow;
+        this.defaultYawFollow = preset.yawFollow;
     }
     
     @Override
@@ -124,11 +126,12 @@ public abstract class TrackingMode extends OutsideMode {
             return null;
         
         float appliedPitch = Mth.clamp((float) (pose.pitch * options.pitchFollowOrDefault(defaultPitchFollow)), -MAX_APPLIED_PITCH, MAX_APPLIED_PITCH);
+        float appliedYaw = pose.blendYaw(options.yawFollowOrDefault(defaultYawFollow));
         CamPoint result = local.copy();
         
         if (usesTemplatePath()) {
             double scale = options.distanceScaleOrDefault(1.0D);
-            Vec3d offset = pose.localToWorld(local.x * scale, local.y, local.z * scale, pose.bodyYaw, appliedPitch);
+            Vec3d offset = pose.localToWorld(local.x * scale, local.y, local.z * scale, appliedYaw, appliedPitch);
             result.x = anchor.x + offset.x;
             result.y = anchor.y + offset.y;
             result.z = anchor.z + offset.z;
@@ -140,10 +143,10 @@ public abstract class TrackingMode extends OutsideMode {
         
         // Scale the authored offset instead of replacing it, this way a smooth start still travels from the player to the preset position.
         double scale = options.distance != null ? options.distanceOrDefault(defaultDistance) / Math.max(defaultDistance, 0.0001D) : 1.0D;
-        Vec3d cameraOffset = pose.localToWorld(local.x * scale, local.y, local.z * scale, pose.bodyYaw, appliedPitch);
+        Vec3d cameraOffset = pose.localToWorld(local.x * scale, local.y, local.z * scale, appliedYaw, appliedPitch);
         Vec3d cameraPos = new Vec3d(anchor.x + cameraOffset.x, anchor.y + cameraOffset.y, anchor.z + cameraOffset.z);
         
-        Vec3d lookOffset = pose.localToWorld(0, lookHeight, -lookAhead, pose.bodyYaw, appliedPitch);
+        Vec3d lookOffset = pose.localToWorld(0, lookHeight, -lookAhead, appliedYaw, appliedPitch);
         Vec3d lookPos = new Vec3d(anchor.x + lookOffset.x, anchor.y + lookOffset.y, anchor.z + lookOffset.z);
         
         double d0 = lookPos.x - cameraPos.x;

@@ -12,9 +12,9 @@ public class CamPreset {
     public static final String SHOULDER = "shoulder";
     public static final String TRACKING = "tracking";
     
-    public static final CamPreset CLOSEUP_PRESET = new CamPreset(CLOSEUP, 0.0D, 0.1D, -1.5D, 0.0D, 0.0D, 50.0D, 1.5D, 0.78D, 250.0D, 0.65D);
-    public static final CamPreset SHOULDER_PRESET = new CamPreset(SHOULDER, 0.8D, 0.4D, 1.8D, 4.0D, 0.1D, 75.0D, 1.8D, 0.65D, 350.0D, 0.35D);
-    public static final CamPreset TRACKING_PRESET = new CamPreset(TRACKING, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 70.0D, 1.6D, 0.65D, 300.0D, 0.5D);
+    public static final CamPreset CLOSEUP_PRESET = new CamPreset(CLOSEUP, 0.0D, 0.1D, -1.5D, 0.0D, 0.0D, 50.0D, 1.5D, 0.78D, 250.0D, 0.65D, 1.0D);
+    public static final CamPreset SHOULDER_PRESET = new CamPreset(SHOULDER, 0.8D, 0.4D, 1.8D, 4.0D, 0.1D, 75.0D, 1.8D, 0.65D, 350.0D, 0.35D, 0.75D);
+    public static final CamPreset TRACKING_PRESET = new CamPreset(TRACKING, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 70.0D, 1.6D, 0.65D, 300.0D, 0.5D, 1.0D);
     
     private static final CamPreset[] PRESETS = new CamPreset[] { CLOSEUP_PRESET, SHOULDER_PRESET, TRACKING_PRESET };
     
@@ -56,9 +56,11 @@ public class CamPreset {
     public final double dampingMs;
     /** how much of the target pitch the camera follows, {@code 0..1} */
     public final double pitchFollow;
+    /** how much the camera follows head/view yaw vs body yaw, {@code 0..1} (0=body, 1=head/view) */
+    public final double yawFollow;
     
     public CamPreset(String id, double offsetX, double offsetY, double offsetZ, double lookAhead, double lookHeight, double fov, double distance, double heightFactor,
-            double dampingMs, double pitchFollow) {
+            double dampingMs, double pitchFollow, double yawFollow) {
         this.id = id;
         this.offsetX = offsetX;
         this.offsetY = offsetY;
@@ -70,6 +72,12 @@ public class CamPreset {
         this.heightFactor = heightFactor;
         this.dampingMs = dampingMs;
         this.pitchFollow = pitchFollow;
+        this.yawFollow = yawFollow;
+    }
+    
+    public CamPreset(String id, double offsetX, double offsetY, double offsetZ, double lookAhead, double lookHeight, double fov, double distance, double heightFactor,
+            double dampingMs, double pitchFollow) {
+        this(id, offsetX, offsetY, offsetZ, lookAhead, lookHeight, fov, distance, heightFactor, dampingMs, pitchFollow, 1.0D);
     }
     
 }

@@ -24,6 +24,8 @@ public class TrackingOptions {
     public static final double MAX_DAMPING_MS = 5000.0D;
     public static final double MIN_PITCH_FOLLOW = 0.0D;
     public static final double MAX_PITCH_FOLLOW = 1.0D;
+    public static final double MIN_YAW_FOLLOW = 0.0D;
+    public static final double MAX_YAW_FOLLOW = 1.0D;
     public static final long MIN_RETURN_DURATION_MS = 0L;
     public static final long MAX_RETURN_DURATION_MS = 10000L;
     public static final long DEFAULT_RETURN_DURATION_MS = 750L;
@@ -46,6 +48,9 @@ public class TrackingOptions {
     /** how much of the target pitch the camera follows, {@code 0..1} */
     public Double pitchFollow;
     
+    /** how much the camera follows head/view yaw vs body yaw, {@code 0..1} (0=body, 1=head/view) */
+    public Double yawFollow;
+    
     /** height anchor on the target bounding box, {@code 0..1} */
     public Double targetHeightFactor;
     
@@ -67,6 +72,7 @@ public class TrackingOptions {
         options.fov = fov;
         options.dampingMs = dampingMs;
         options.pitchFollow = pitchFollow;
+        options.yawFollow = yawFollow;
         options.targetHeightFactor = targetHeightFactor;
         options.returnDurationMs = returnDurationMs;
         return options;
@@ -90,6 +96,10 @@ public class TrackingOptions {
     
     public double pitchFollowOrDefault(double fallback) {
         return pitchFollow != null ? clamp(pitchFollow, MIN_PITCH_FOLLOW, MAX_PITCH_FOLLOW) : fallback;
+    }
+    
+    public double yawFollowOrDefault(double fallback) {
+        return yawFollow != null ? clamp(yawFollow, MIN_YAW_FOLLOW, MAX_YAW_FOLLOW) : fallback;
     }
     
     public double heightFactorOrDefault(double fallback) {
@@ -116,6 +126,8 @@ public class TrackingOptions {
             throw new SceneException("scene.tracking.invalid_damping", MIN_DAMPING_MS, MAX_DAMPING_MS);
         if (invalid(pitchFollow, MIN_PITCH_FOLLOW, MAX_PITCH_FOLLOW))
             throw new SceneException("scene.tracking.invalid_pitch_follow", MIN_PITCH_FOLLOW, MAX_PITCH_FOLLOW);
+        if (invalid(yawFollow, MIN_YAW_FOLLOW, MAX_YAW_FOLLOW))
+            throw new SceneException("scene.tracking.invalid_pitch_follow", MIN_YAW_FOLLOW, MAX_YAW_FOLLOW);
         if (invalid(targetHeightFactor, 0.0D, 1.0D))
             throw new SceneException("scene.tracking.invalid_pitch_follow", 0.0D, 1.0D);
     }
@@ -133,6 +145,8 @@ public class TrackingOptions {
             nbt.putDouble("damping", dampingMs);
         if (pitchFollow != null)
             nbt.putDouble("pitch_follow", pitchFollow);
+        if (yawFollow != null)
+            nbt.putDouble("yaw_follow", yawFollow);
         if (targetHeightFactor != null)
             nbt.putDouble("height_factor", targetHeightFactor);
         nbt.putLong("return_duration", returnDurationMs);
@@ -149,6 +163,7 @@ public class TrackingOptions {
         options.fov = nbt.contains("fov") ? nbt.getDouble("fov") : null;
         options.dampingMs = nbt.contains("damping") ? nbt.getDouble("damping") : null;
         options.pitchFollow = nbt.contains("pitch_follow") ? nbt.getDouble("pitch_follow") : null;
+        options.yawFollow = nbt.contains("yaw_follow") ? nbt.getDouble("yaw_follow") : null;
         options.targetHeightFactor = nbt.contains("height_factor") ? nbt.getDouble("height_factor") : null;
         options.returnDurationMs = nbt.contains("return_duration") ? nbt.getLong("return_duration") : DEFAULT_RETURN_DURATION_MS;
         return options;

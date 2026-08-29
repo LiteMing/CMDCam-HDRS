@@ -36,10 +36,10 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
         new LiteralMessage("Invalid option"));
     
     private static final List<String> PRESET_KEYS = Arrays.asList(
-        "duration", "distance", "fov", "damping", "pitch_follow"
+        "duration", "distance", "fov", "damping", "pitch_follow", "yaw_follow"
     );
     private static final List<String> TRACKING_KEYS = Arrays.asList(
-        "duration", "distance_scale", "fov", "damping", "pitch_follow"
+        "duration", "distance_scale", "fov", "damping", "pitch_follow", "yaw_follow"
     );
     
     public static class ParsedOptions {
@@ -131,6 +131,9 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
                 case "pitch_follow":
                     options.pitchFollow = reader.readDouble();
                     break;
+                case "yaw_follow":
+                    options.yawFollow = reader.readDouble();
+                    break;
                 default:
                     reader.setCursor(valStart);
                     throw UNKNOWN_KEY.createWithContext(reader, key);
@@ -190,6 +193,9 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
             } else if ("pitch_follow".equals(key)) {
                 List<String> examples = Arrays.asList(prefix + "0.0", prefix + "0.5", prefix + "1.0");
                 return SharedSuggestionProvider.suggest(examples, currentBuilder);
+            } else if ("yaw_follow".equals(key)) {
+                List<String> examples = Arrays.asList(prefix + "0.0", prefix + "0.75", prefix + "1.0");
+                return SharedSuggestionProvider.suggest(examples, currentBuilder);
             }
             return Suggestions.empty();
         }
@@ -208,7 +214,7 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
     @Override
     public Collection<String> getExamples() {
         return isPreset
-            ? Arrays.asList("fov=50", "distance=2.5 fov=60", "duration=160t damping=500")
-            : Arrays.asList("fov=50", "distance_scale=1.5 fov=60", "duration=160t damping=500");
+            ? Arrays.asList("fov=50", "distance=2.5 fov=60", "duration=160t damping=500", "yaw_follow=0.75")
+            : Arrays.asList("fov=50", "distance_scale=1.5 fov=60", "duration=160t damping=500", "yaw_follow=1.0");
     }
 }
