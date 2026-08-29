@@ -36,6 +36,8 @@ public class OutsideMode extends CamMode {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null)
             mc.cameraEntity = mc.player;
+        else
+            mc.cameraEntity = null;
         camPlayer = null;
     }
     

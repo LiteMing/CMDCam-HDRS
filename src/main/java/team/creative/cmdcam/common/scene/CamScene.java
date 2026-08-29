@@ -199,10 +199,17 @@ public class CamScene {
         
         stop();
         if (run != null) {
-            if (mode != null)
-                mode.finished(run);
-            run.finish();
-            run = null;
+            CamRun currentRun = run;
+            try {
+                if (mode != null)
+                    mode.finished(currentRun);
+            } finally {
+                try {
+                    currentRun.finish();
+                } finally {
+                    run = null;
+                }
+            }
         }
         
         started = false;

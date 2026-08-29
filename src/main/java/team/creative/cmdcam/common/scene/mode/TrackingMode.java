@@ -50,13 +50,18 @@ public abstract class TrackingMode extends OutsideMode {
     public void finished(CamRun run) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            Entity cam = (cameraEntityBefore != null && !cameraEntityBefore.isRemoved()) ? cameraEntityBefore : mc.player;
+            Entity cam = (cameraEntityBefore != null && !cameraEntityBefore.isRemoved() && cameraEntityBefore.level() == mc.player.level())
+                    ? cameraEntityBefore : mc.player;
             mc.cameraEntity = cam;
-            if (cameraTypeBefore != null)
-                mc.options.setCameraType(cameraTypeBefore);
-            CamEventHandlerClient.fov(fovOffsetBefore);
-            CamEventHandlerClient.roll(rollBefore);
+        } else {
+            mc.cameraEntity = null;
         }
+        
+        if (cameraTypeBefore != null)
+            mc.options.setCameraType(cameraTypeBefore);
+        CamEventHandlerClient.fov(fovOffsetBefore);
+        CamEventHandlerClient.roll(rollBefore);
+        
         camPlayer = null;
     }
     
