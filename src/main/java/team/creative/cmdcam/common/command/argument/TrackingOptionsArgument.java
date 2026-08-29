@@ -213,6 +213,10 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
             return 0x00FF00;
         
         String hex = colorStr.startsWith("#") ? colorStr.substring(1) : colorStr;
+        if (!hex.matches("[0-9a-fA-F]{6}")) {
+            reader.setCursor(valStart);
+            throw INVALID_COLOR.createWithContext(reader, colorStr);
+        }
         try {
             return Integer.parseInt(hex, 16);
         } catch (NumberFormatException e) {

@@ -45,6 +45,7 @@ public class CamRun {
     private boolean returning = false;
     private int targetMissingTicks = 0;
     private CamStopReason stopReason;
+    private boolean exitDispatched = false;
     
     public CamRun(Level level, CamScene scene) {
         Entity camera = Minecraft.getInstance().player;
@@ -53,7 +54,8 @@ public class CamRun {
         boolean smoothEntry = scene.smoothBeginning;
         long enterDuration = 750L;
         if (scene.trackingOptions != null) {
-            if (scene.trackingOptions.enterStyle == team.creative.cmdcam.common.scene.tracking.CamTransitionStyle.CUT)
+            // Only SMOOTH transition style creates a spatial smooth flight entry
+            if (scene.trackingOptions.enterStyle != team.creative.cmdcam.common.scene.tracking.CamTransitionStyle.SMOOTH)
                 smoothEntry = false;
             enterDuration = scene.trackingOptions.enterDurationOrDefault(750L);
             if (enterDuration <= 0)
@@ -178,9 +180,10 @@ public class CamRun {
                     time = 0;
                 } else {
                     // All stages (including the return stage) have finished.
-                    if (stopReason == null)
-                        stopReason = CamStopReason.NATURAL_END;
-                    scene.finish(level);
+                    if (!exitDispatched) {
+                        exitDispatched = true;
+                        CMDCamClient.requestStop(CamStopReason.NATURAL_END);
+                    }
                     return;
                 }
             }
@@ -193,14 +196,20 @@ public class CamRun {
     
     public void gameTick(Level level) {
         timer.tick(running);
-        if (scene.tracking && !isReturning() && returnStageIndex >= 0 && scene.posTarget != null) {
+        if (scene.tracking && !isReturning() && scene.posTarget != null) {
             float partial = TickUtils.getFrameTime(level);
             if (!scene.posTarget.pose(level, partial).valid) {
-                if (++targetMissingTicks >= 15)
-                    requestReturn(CamStopReason.TARGET_LOST);
+                if (++targetMissingTicks >= 15 && !exitDispatched) {
+                    exitDispatched = true;
+                    CMDCamClient.requestStop(CamStopReason.TARGET_LOST);
+                }
             } else
                 targetMissingTicks = 0;
         }
+    }
+    
+    public boolean hasReturnStage() {
+        return returnStageIndex >= 0;
     }
     
     public boolean isReturning() {

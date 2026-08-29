@@ -331,24 +331,37 @@ public class CMDCamClient {
         if (playing == null)
             return;
         
-        if (playing.tracking && playing.trackingOptions != null && playing.trackingOptions.exitStyle == team.creative.cmdcam.common.scene.tracking.CamTransitionStyle.FADE) {
-            long duration = playing.trackingOptions.returnDurationOrDefault(750L);
-            int color = playing.trackingOptions.fadeColorOrDefault(0x000000);
-            CamFadeController.startFullTransition(duration, color, () -> finishImmediately(reason), null);
-            return;
-        }
+        team.creative.cmdcam.common.scene.tracking.CamTransitionStyle exitStyle =
+            playing.trackingOptions != null ? playing.trackingOptions.exitStyle : team.creative.cmdcam.common.scene.tracking.CamTransitionStyle.SMOOTH;
         
-        if (reason.smoothReturn && playing.tracking && playing.run != null)
-            playing.run.requestReturn(reason);
-        else
-            finishImmediately(reason);
+        switch (exitStyle) {
+            case CUT:
+                finishImmediately(reason);
+                return;
+            case FADE:
+                long duration = playing.trackingOptions.returnDurationOrDefault(750L);
+                int color = playing.trackingOptions.fadeColorOrDefault(0x000000);
+                CamFadeController.startFullTransition(duration, color, () -> finishImmediately(reason, false), null);
+                return;
+            case SMOOTH:
+            default:
+                if (reason.smoothReturn && playing.tracking && playing.run != null && playing.run.hasReturnStage())
+                    playing.run.requestReturn(reason);
+                else
+                    finishImmediately(reason);
+                return;
+        }
     }
     
     public static void finishImmediately(CamStopReason reason) {
-        // Always clear the pending queue and fade controller on any finish path,
-        // including world-unload and dimension change.
+        finishImmediately(reason, true);
+    }
+    
+    public static void finishImmediately(CamStopReason reason, boolean resetFade) {
+        // Always clear the pending queue on any finish path.
         cancelPendingStart();
-        CamFadeController.reset();
+        if (resetFade)
+            CamFadeController.reset();
         
         CamScene current = playing;
         if (current == null)

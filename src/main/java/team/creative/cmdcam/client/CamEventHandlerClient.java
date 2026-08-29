@@ -31,6 +31,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.client.event.RenderLevelStageEvent.Stage;
 import net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles;
 import net.minecraftforge.client.event.ViewportEvent.ComputeFov;
@@ -389,8 +390,9 @@ public class CamEventHandlerClient {
     
     @SubscribeEvent
     public void onRenderGuiOverlay(RenderGuiOverlayEvent.Post event) {
-        if (CamFadeController.isActive()) {
-            CamFadeController.renderOverlay(MC.getWindow().getGuiScaledWidth(), MC.getWindow().getGuiScaledHeight());
+        // Draw only once per frame after all chat/HUD elements are done
+        if (VanillaGuiOverlay.CHAT_PANEL.id().equals(event.getOverlay().id()) && CamFadeController.isActive()) {
+            CamFadeController.renderOverlay(event.getGuiGraphics(), MC.getWindow().getGuiScaledWidth(), MC.getWindow().getGuiScaledHeight());
         }
     }
     

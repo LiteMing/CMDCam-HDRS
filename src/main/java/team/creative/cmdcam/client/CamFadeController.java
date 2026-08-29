@@ -1,22 +1,16 @@
 package team.creative.cmdcam.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat.Mode;
-
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import org.joml.Matrix4f;
 
 /**
- * Renders full-screen solid color overlays for smooth camera transitions.
- * Independent of HUD hideGui and title rendering.
+ * High-precision, frame-rate independent full-screen color fade controller.
+ * State updates happen on client ticks, while alpha evaluation and rendering happen smoothly every frame.
  */
 @OnlyIn(Dist.CLIENT)
 public class CamFadeController {
@@ -33,17 +27,15 @@ public class CamFadeController {
     private static long startTime = 0L;
     private static long duration = 0L;
     private static int colorRgb = 0x000000;
-    private static float currentAlpha = 0.0F;
     private static Runnable onMidpointAction = null;
     private static Runnable onCompleteAction = null;
     
     public static boolean isActive() {
-        return state != State.IDLE || currentAlpha > 0.001F;
+        return state != State.IDLE;
     }
     
     public static void reset() {
         state = State.IDLE;
-        currentAlpha = 0.0F;
         onMidpointAction = null;
         onCompleteAction = null;
     }
@@ -66,40 +58,33 @@ public class CamFadeController {
         }
         
         long half = Math.max(totalDurationMs / 2, 1L);
-        colorRgb = rgb;
+        colorRgb = rgb & 0xFFFFFF;
         duration = half;
         onMidpointAction = onMidpoint;
         onCompleteAction = onComplete;
         startTime = Util.getMillis();
         state = State.FADING_OUT;
-        currentAlpha = 0.0F;
     }
     
+    /** Called on ClientTickEvent to drive phase transitions and callbacks. */
     public static void update() {
         if (state == State.IDLE)
             return;
         
         long elapsed = Util.getMillis() - startTime;
-        float progress = duration > 0 ? (float) elapsed / (float) duration : 1.0F;
-        progress = Mth.clamp(progress, 0.0F, 1.0F);
-        
         if (state == State.FADING_OUT) {
-            currentAlpha = progress;
-            if (progress >= 1.0F) {
-                currentAlpha = 1.0F;
+            if (elapsed >= duration) {
+                // Switch phase before running midpoint action so subsequent finish/start calls know we are fading in
+                state = State.FADING_IN;
+                startTime = Util.getMillis();
                 if (onMidpointAction != null) {
                     Runnable action = onMidpointAction;
                     onMidpointAction = null;
                     action.run();
                 }
-                // Transition to fade-in
-                state = State.FADING_IN;
-                startTime = Util.getMillis();
             }
         } else if (state == State.FADING_IN) {
-            currentAlpha = 1.0F - progress;
-            if (progress >= 1.0F) {
-                currentAlpha = 0.0F;
+            if (elapsed >= duration) {
                 state = State.IDLE;
                 if (onCompleteAction != null) {
                     Runnable action = onCompleteAction;
@@ -110,40 +95,35 @@ public class CamFadeController {
         }
     }
     
-    public static void renderOverlay(int screenWidth, int screenHeight) {
-        if (currentAlpha <= 0.001F)
+    /** Calculates smooth per-frame alpha value using millisecond timestamp. */
+    public static float getRenderAlpha() {
+        if (state == State.IDLE)
+            return 0.0F;
+        
+        long elapsed = Util.getMillis() - startTime;
+        float progress = duration > 0 ? (float) elapsed / (float) duration : 1.0F;
+        progress = Mth.clamp(progress, 0.0F, 1.0F);
+        
+        if (state == State.FADING_OUT)
+            return progress;
+        else if (state == State.FADING_IN)
+            return 1.0F - progress;
+        return 0.0F;
+    }
+    
+    /** Renders overlay once per frame using vanilla GuiGraphics to avoid matrix/state corruption. */
+    public static void renderOverlay(GuiGraphics guiGraphics, int screenWidth, int screenHeight) {
+        float alpha = getRenderAlpha();
+        if (alpha <= 0.001F)
             return;
         
-        float r = ((colorRgb >> 16) & 0xFF) / 255.0F;
-        float g = ((colorRgb >> 8) & 0xFF) / 255.0F;
-        float b = (colorRgb & 0xFF) / 255.0F;
-        float a = Mth.clamp(currentAlpha, 0.0F, 1.0F);
+        int a = Mth.clamp((int) (alpha * 255.0F), 0, 255);
+        int argb = (a << 24) | colorRgb;
         
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
         RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
-        
-        Matrix4f matrix = new Matrix4f().ortho(0, screenWidth, screenHeight, 0, -1000.0F, 3000.0F);
-        RenderSystem.setProjectionMatrix(matrix, com.mojang.blaze3d.vertex.VertexSorting.ORTHOGRAPHIC_Z);
-        RenderSystem.getModelViewStack().pushPose();
-        RenderSystem.getModelViewStack().setIdentity();
-        RenderSystem.applyModelViewMatrix();
-        
-        Tesselator tessellator = Tesselator.getInstance();
-        BufferBuilder buffer = tessellator.getBuilder();
-        buffer.begin(Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        buffer.vertex(0, screenHeight, 0).color(r, g, b, a).endVertex();
-        buffer.vertex(screenWidth, screenHeight, 0).color(r, g, b, a).endVertex();
-        buffer.vertex(screenWidth, 0, 0).color(r, g, b, a).endVertex();
-        buffer.vertex(0, 0, 0).color(r, g, b, a).endVertex();
-        tessellator.end();
-        
-        RenderSystem.getModelViewStack().popPose();
-        RenderSystem.applyModelViewMatrix();
+        guiGraphics.fill(0, 0, screenWidth, screenHeight, argb);
         RenderSystem.depthMask(true);
         RenderSystem.enableDepthTest();
-        RenderSystem.disableBlend();
     }
 }
