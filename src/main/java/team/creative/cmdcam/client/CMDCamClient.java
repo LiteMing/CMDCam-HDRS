@@ -47,17 +47,24 @@ public class CMDCamClient {
     private static boolean hasTargetMarker;
     private static CamPoint targetMarker;
     
+    // ---------------------------------------------------------------------------
+    // Pending tracking start
+    // ---------------------------------------------------------------------------
+    
     /**
-     * A tracking camera start that is deferred until the target entity becomes available on the
-     * client, or until the timeout expires.
-     * <p>
-     * This is the primary defence against the "local-coords-as-world-coords" bug: we refuse to
-     * create a {@link team.creative.cmdcam.common.scene.run.CamRun} while the target pose is
-     * invalid, because {@code CamRun}'s smooth-entry logic would otherwise produce a control point
-     * at the entity-local offset interpreted as an absolute world position.
+     * A tracking camera start that is deferred until the target entity becomes available
+     * on the client, or until the timeout expires.
+     *
+     * <p>This is the primary defence against the "local-coords-as-world-coords" bug: we
+     * refuse to create a {@link team.creative.cmdcam.common.scene.run.CamRun} while the
+     * target pose is invalid, because {@code CamRun}'s smooth-entry logic would otherwise
+     * produce a control point at the entity-local offset interpreted as an absolute world
+     * position.
+     *
+     * <p><b>Invariant:</b> {@code pendingTrackingStart != null} implies {@code playing == null}.
+     * Any transition that sets {@code playing} must first call {@link #cancelPendingStart()}.
      */
     private static final class PendingTrackingStart {
-        
         /** Maximum game ticks to wait for the target entity to become available. */
         static final int TIMEOUT_TICKS = 40; // 2 seconds at 20 TPS
         
@@ -69,13 +76,30 @@ public class CMDCamClient {
             this.remainingTicks = TIMEOUT_TICKS;
         }
         
-        /** Returns {@code true} when the timeout has been reached. */
+        /** Decrements the counter. Returns {@code true} when the timeout has been reached. */
         boolean tick() {
             return --remainingTicks <= 0;
         }
     }
     
     private static PendingTrackingStart pendingTrackingStart;
+    
+    /** Returns {@code true} if a tracking camera start is queued but not yet launched. */
+    public static boolean hasPendingTrackingStart() {
+        return pendingTrackingStart != null;
+    }
+    
+    /**
+     * Silently discards any queued tracking start.  Must be called before every transition
+     * that sets {@code playing} or reaches a terminal state (stop/world-unload/etc.).
+     */
+    private static void cancelPendingStart() {
+        pendingTrackingStart = null;
+    }
+    
+    // ---------------------------------------------------------------------------
+    // Initialisation
+    // ---------------------------------------------------------------------------
     
     public static void resetServerAvailability() {
         serverAvailable = false;
@@ -187,6 +211,10 @@ public class CMDCamClient {
         
     }
     
+    // ---------------------------------------------------------------------------
+    // Scene queries
+    // ---------------------------------------------------------------------------
+    
     public static void renderBefore(RenderPlayerEvent.Pre event) {}
     
     public static CamScene getScene() {
@@ -218,44 +246,74 @@ public class CMDCamClient {
             targetMarker = CamPoint.createLocal();
     }
     
+    // ---------------------------------------------------------------------------
+    // Public start API
+    // ---------------------------------------------------------------------------
+    
+    /**
+     * Starts a plain (non-tracking) scene immediately.
+     *
+     * <p>This is the safe public entry point: it cancels any pending tracking start and
+     * replaces any currently playing scene before launching the new one. Callers must not
+     * call {@link #finishImmediately} themselves before calling this method.
+     */
     public static void start(CamScene scene) {
+        cancelPendingStart();
+        if (playing != null)
+            finishImmediately(CamStopReason.OVERWRITE);
         if (scene.points.isEmpty())
             return;
         if (scene.points.size() == 1)
             scene.points.add(scene.points.get(0));
-        playing = scene;
-        playing.play();
+        startNow(scene);
     }
     
     /**
-     * Entry point for server-initiated tracking cameras (closeup, shoulder, tracking template).
-     * <p>
-     * If the target entity is already present on the client, the camera starts immediately.
-     * Otherwise the start is deferred for up to {@link PendingTrackingStart#TIMEOUT_TICKS} ticks
-     * so that the target has time to arrive. This prevents a {@code CamRun} from being built
-     * while the target pose is invalid, which would cause the smooth-entry control point to carry
-     * an absolute world position misinterpreted as a local entity offset.
+     * Entry point for server-initiated tracking cameras (closeup, shoulder, tracking
+     * template).
+     *
+     * <p>If the target entity is already present on the client, the camera starts
+     * immediately via {@link #startNow}. Otherwise the start is deferred for up to
+     * {@link PendingTrackingStart#TIMEOUT_TICKS} ticks so the target has time to arrive.
+     * This prevents a {@code CamRun} from being built while the target pose is invalid.
+     *
+     * <p>Any previously playing scene and any previous pending start are cancelled first,
+     * so this method is safe to call multiple times.
      */
     public static void startCloseup(CamScene scene) {
+        // Cancel whatever is already going on before entering pending state.
+        cancelPendingStart();
         if (playing != null)
             finishImmediately(CamStopReason.OVERWRITE);
-        
-        // Cancel any previous pending start that has not yet launched.
-        pendingTrackingStart = null;
         
         if (scene.tracking && scene.posTarget != null && mc.level != null) {
             float partial = TickUtils.getFrameTime(mc.level);
             CamTargetPose pose = scene.posTarget.pose(mc.level, partial);
             if (!pose.valid) {
-                // Target not yet loaded: queue and wait.
+                // Target not yet loaded on this client: queue and wait.
                 pendingTrackingStart = new PendingTrackingStart(scene);
                 return;
             }
         }
         
-        // Target is available (or scene does not use tracking) – start immediately.
-        start(scene);
+        // Target is available (or scene does not use tracking) -- start immediately.
+        startNow(scene);
     }
+    
+    /**
+     * Actually creates the {@code CamRun} and starts playback.
+     *
+     * <p><b>Private invariant:</b> callers must have already cancelled any pending start
+     * and finished any previous run before calling this method.
+     */
+    private static void startNow(CamScene scene) {
+        playing = scene;
+        playing.play();
+    }
+    
+    // ---------------------------------------------------------------------------
+    // Stop API
+    // ---------------------------------------------------------------------------
     
     public static void requestStop(CamStopReason reason) {
         if (playing == null)
@@ -267,6 +325,10 @@ public class CMDCamClient {
     }
     
     public static void finishImmediately(CamStopReason reason) {
+        // Always clear the pending queue on any finish path, including world-unload and
+        // dimension change, so a queued closeup can never start after the level is gone.
+        cancelPendingStart();
+        
         CamScene current = playing;
         if (current == null)
             return;
@@ -304,7 +366,9 @@ public class CMDCamClient {
             playing.resume();
     }
     
+    /** Stops a locally started (non-server-synced) scene. Also cancels any pending start. */
     public static void stop() {
+        cancelPendingStart();
         if (playing == null)
             return;
         if (playing.serverSynced())
@@ -312,24 +376,37 @@ public class CMDCamClient {
         requestStop(CamStopReason.COMMAND_STOP);
     }
     
+    /** Stops the current scene on a server-stop command. Also cancels any pending start. */
     public static void stopServer() {
+        cancelPendingStart();
         if (playing == null)
             return;
         requestStop(CamStopReason.COMMAND_STOP);
     }
     
+    // ---------------------------------------------------------------------------
+    // Tick methods
+    // ---------------------------------------------------------------------------
+    
     public static void noTickPath(Level level, float renderTickTime) {
         hideGuiCache = mc.options.hideGui;
     }
     
-    public static void gameTickPath(Level level) {
+    /**
+     * Called every game tick regardless of whether a scene is playing.
+     *
+     * <p>This replaces the old {@code gameTickPath()} which was only called when
+     * {@code isPlaying() == true}, causing {@link PendingTrackingStart} to never advance.
+     */
+    public static void clientTick(Level level) {
         tickPendingStart(level);
         if (playing != null)
             playing.gameTick(level);
     }
     
     /**
-     * Called every game tick to check whether a deferred tracking camera start can proceed.
+     * Checks whether a deferred tracking camera start can proceed.  Must be called every
+     * game tick even when nothing is playing.
      */
     private static void tickPendingStart(Level level) {
         if (pendingTrackingStart == null)
@@ -337,21 +414,21 @@ public class CMDCamClient {
         
         CamScene pendingScene = pendingTrackingStart.scene;
         
-        // Check if the target entity has appeared on the client yet.
+        // Check if the target entity has appeared on the client.
         if (pendingScene.posTarget != null) {
             float partial = TickUtils.getFrameTime(level);
             CamTargetPose pose = pendingScene.posTarget.pose(level, partial);
             if (pose.valid) {
                 pendingTrackingStart = null;
-                start(pendingScene);
+                startNow(pendingScene);
                 return;
             }
         }
         
-        // Still waiting – count down the timeout.
+        // Still waiting -- count down the timeout.
         if (pendingTrackingStart.tick()) {
             pendingTrackingStart = null;
-            CMDCam.LOGGER.warn("CMDCam: tracking camera start timed out – target entity never appeared on client");
+            CMDCam.LOGGER.warn("CMDCam: tracking camera start timed out -- target entity never appeared on client");
             if (mc.player != null)
                 mc.player.sendSystemMessage(Component.translatable("scene.closeup.target_unavailable"));
         }
@@ -366,6 +443,10 @@ public class CMDCamClient {
             playing = null;
         }
     }
+    
+    // ---------------------------------------------------------------------------
+    // Misc helpers
+    // ---------------------------------------------------------------------------
     
     public static void resetTargetMarker() {
         targetMarker = null;

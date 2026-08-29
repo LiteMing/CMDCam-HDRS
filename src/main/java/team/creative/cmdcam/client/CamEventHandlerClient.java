@@ -121,10 +121,16 @@ public class CamEventHandlerClient {
     public void onClientTick(ClientTickEvent event) {
         if (event.phase == Phase.END)
             return;
-        if (MC.player != null && (!MC.player.isAlive() || MC.player.isRemoved()) && CMDCamClient.isPlaying())
-            CMDCamClient.finishImmediately(CamStopReason.PLAYER_DEAD);
-        if (MC.player != null && MC.level != null && !MC.isPaused() && CMDCamClient.isPlaying())
-            CMDCamClient.gameTickPath(MC.level);
+        // Cancel (or finish) on player death regardless of pending/playing state.
+        if (MC.player != null && (!MC.player.isAlive() || MC.player.isRemoved())) {
+            if (CMDCamClient.hasPendingTrackingStart() || CMDCamClient.isPlaying())
+                CMDCamClient.finishImmediately(CamStopReason.PLAYER_DEAD);
+        }
+        // clientTick() drives both the pending-start queue AND the active scene's game logic.
+        // It must run unconditionally -- NOT guarded by isPlaying() -- so that
+        // PendingTrackingStart advances even when nothing is currently playing.
+        if (MC.player != null && MC.level != null && !MC.isPaused())
+            CMDCamClient.clientTick(MC.level);
     }
     
     private double calculatePointInCurve(double fov) {

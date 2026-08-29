@@ -63,6 +63,18 @@ public class CamScene {
     public long targetReturnDuration = 750L;
     /** runtime configuration of the entity bound camera, only present while {@link #tracking} is true */
     public TrackingOptions trackingOptions;
+    /**
+     * The target entity's body yaw (degrees) at the time the tracking path was authored.
+     * Used by {@code FollowPathMode} to rotate the authored control-point angles into the
+     * target's local space on playback, so the camera looks in the correct direction even
+     * when the target is facing a different way than when the path was recorded.
+     *
+     * <p>{@code Float.NaN} means "not set" (legacy scene authored before this field
+     * existed). In that case {@code FollowPathMode} falls back to the old delta-from-
+     * first-frame behaviour, which is correct for scenes authored against their original
+     * target but wrong for reuse against a differently-facing entity.
+     */
+    public float trackingReferenceYaw = Float.NaN;
     
     @OnlyIn(Dist.CLIENT)
     public CamRun run;
@@ -96,6 +108,8 @@ public class CamScene {
         this.smoothBeginning = nbt.getBoolean("smooth_start");
         this.pitchMode = CamPitchMode.values()[nbt.getInt("pitch_mode")];
         this.distanceBasedTiming = nbt.getBoolean("d_timing");
+        this.trackingReferenceYaw = nbt.contains("tracking_ref_yaw")
+            ? nbt.getFloat("tracking_ref_yaw") : Float.NaN;
     }
     
     public void setServerSynced() {
@@ -143,6 +157,8 @@ public class CamScene {
         nbt.putBoolean("smooth_start", smoothBeginning);
         nbt.putInt("pitch_mode", pitchMode.ordinal());
         nbt.putBoolean("d_timing", distanceBasedTiming);
+        if (!Float.isNaN(trackingReferenceYaw))
+            nbt.putFloat("tracking_ref_yaw", trackingReferenceYaw);
         
         return nbt;
     }
@@ -265,6 +281,7 @@ public class CamScene {
         this.targetHeightFactor = scene.targetHeightFactor;
         this.targetReturnDuration = scene.targetReturnDuration;
         this.trackingOptions = scene.trackingOptions;
+        this.trackingReferenceYaw = scene.trackingReferenceYaw;
     }
     
     public void setMode(String mode) {

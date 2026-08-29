@@ -153,11 +153,15 @@ public class CamRun {
             else {
                 currentStage++;
                 if (currentStage < stages.size()) {
+                    // Record natural-end reason as soon as we step into the return stage so
+                    // stopReason() is never null while isReturning() is true.
+                    if (stopReason == null)
+                        stopReason = CamStopReason.NATURAL_END;
                     stage = stages.get(currentStage);
                     stage.start();
                     time = 0;
                 } else {
-                    // Natural playback end: record reason before finishing so callers can inspect it.
+                    // All stages (including the return stage) have finished.
                     if (stopReason == null)
                         stopReason = CamStopReason.NATURAL_END;
                     scene.finish(level);
@@ -165,6 +169,7 @@ public class CamRun {
                 }
             }
         }
+
         
         mc.options.hideGui = true;
         scene.mode.process(stage.calculatePoint(level, time, deltaTime));

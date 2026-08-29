@@ -11,9 +11,11 @@ public class StopPathPacket extends CreativePacket {
     
     @Override
     public void executeClient(Player player) {
-        if (CMDCamClient.isPlaying() && CMDCamClient.getScene().serverSynced())
-            CMDCamClient.stopServer();
+        // stopServer() cancels any pending tracking start AND stops any actively playing
+        // server-synced scene, so the guard must not be isPlaying()-only.
+        CMDCamClient.stopServer();
     }
+
     
     @Override
     public void executeServer(ServerPlayer player) {}

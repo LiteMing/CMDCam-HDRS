@@ -5,7 +5,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import team.creative.cmdcam.client.CMDCamClient;
 import team.creative.cmdcam.common.scene.CamScene;
-import team.creative.cmdcam.common.scene.run.CamStopReason;
 import team.creative.creativecore.common.network.CreativePacket;
 import team.creative.creativecore.common.util.registry.exception.RegistryException;
 
@@ -24,8 +23,8 @@ public class StartPathPacket extends CreativePacket {
         try {
             CamScene path = new CamScene(nbt);
             path.setServerSynced();
-            if (CMDCamClient.isPlaying())
-                CMDCamClient.finishImmediately(CamStopReason.OVERWRITE);
+            // start() is the safe replacement entry: it cancels any pending tracking start
+            // and finishes any currently playing scene before launching the new one.
             CMDCamClient.start(path);
         } catch (RegistryException e) {
             e.printStackTrace();
