@@ -205,19 +205,28 @@ public class CMDCamClient {
         if (playing == null)
             return;
         if (reason.smoothReturn && playing.tracking && playing.run != null)
-            playing.run.requestReturn();
+            playing.run.requestReturn(reason);
         else
             finishImmediately(reason);
     }
     
     public static void finishImmediately(CamStopReason reason) {
-        if (playing == null)
+        CamScene current = playing;
+        if (current == null)
             return;
-        CamScene scene = playing;
-        playing = null;
-        mc.options.hideGui = hideGuiCache;
-        if (mc.level != null)
-            scene.finish(mc.level);
+        
+        try {
+            current.finish(mc.level);
+        } finally {
+            playing = null;
+            mc.options.hideGui = hideGuiCache;
+            
+            if (mc.player != null)
+                mc.cameraEntity = mc.player;
+            
+            CamEventHandlerClient.resetFOV();
+            CamEventHandlerClient.resetRoll();
+        }
     }
     
     public static void pause() {

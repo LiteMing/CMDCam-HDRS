@@ -55,7 +55,7 @@ public class CMDCam {
     
     public static final String MODID = "cmdcam";
     
-    private static final Logger LOGGER = LogManager.getLogger(CMDCam.MODID);
+    public static final Logger LOGGER = LogManager.getLogger(CMDCam.MODID);
     public static final CreativeNetwork NETWORK = new CreativeNetwork(1, LOGGER, new ResourceLocation(CMDCam.MODID, "main"));
     public static final CMDCamConfig CONFIG = new CMDCamConfig();
     public static final DeferredRegister<ArgumentTypeInfo<?, ?>> COMMAND_ARGUMENT_TYPES = DeferredRegister.create(Registries.COMMAND_ARGUMENT_TYPE, MODID);

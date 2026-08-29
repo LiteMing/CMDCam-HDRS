@@ -198,8 +198,11 @@ public class CamScene {
             posTarget.finish();
         
         stop();
-        if (level.isClientSide && run != null) {
-            mode.finished(run);
+        if (run != null) {
+            if (level != null && level.isClientSide)
+                mode.finished(run);
+            else if (mode != null)
+                mode.finished(run);
             run.finish();
             run = null;
         }
@@ -242,6 +245,9 @@ public class CamScene {
         this.smoothBeginning = scene.smoothBeginning;
         this.pitchMode = scene.pitchMode;
         this.distanceBasedTiming = scene.distanceBasedTiming;
+        this.tracking = scene.tracking;
+        this.targetHeightFactor = scene.targetHeightFactor;
+        this.targetReturnDuration = scene.targetReturnDuration;
     }
     
     public void setMode(String mode) {

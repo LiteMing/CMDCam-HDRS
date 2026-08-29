@@ -121,6 +121,8 @@ public class CamEventHandlerClient {
     public void onClientTick(ClientTickEvent event) {
         if (event.phase == Phase.END)
             return;
+        if (MC.player != null && (!MC.player.isAlive() || MC.player.isRemoved()) && CMDCamClient.isPlaying())
+            CMDCamClient.finishImmediately(CamStopReason.PLAYER_DEAD);
         if (MC.player != null && MC.level != null && !MC.isPaused() && CMDCamClient.isPlaying())
             CMDCamClient.gameTickPath(MC.level);
     }

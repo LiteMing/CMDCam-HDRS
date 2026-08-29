@@ -4,6 +4,7 @@ public enum CamStopReason {
     NATURAL_END(true),
     COMMAND_STOP(true),
     TARGET_LOST(true),
+    INVALID_PACKET(false),
     OVERWRITE(false),
     DISCONNECT(false),
     WORLD_UNLOAD(false),

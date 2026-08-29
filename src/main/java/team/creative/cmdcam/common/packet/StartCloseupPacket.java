@@ -2,7 +2,11 @@ package team.creative.cmdcam.common.packet;
 
 import java.util.UUID;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import team.creative.cmdcam.client.CMDCamClient;
@@ -12,6 +16,8 @@ import team.creative.creativecore.common.network.CreativePacket;
 import team.creative.creativecore.common.util.registry.exception.RegistryException;
 
 public class StartCloseupPacket extends CreativePacket {
+    
+    private static final Logger LOGGER = LogManager.getLogger("cmdcam");
     
     public CompoundTag sceneNbt;
     public UUID targetUuid;
@@ -34,8 +40,11 @@ public class StartCloseupPacket extends CreativePacket {
             scene.setServerSynced();
             scene.bindTracking(targetUuid, targetHeightFactor, returnDuration);
             CMDCamClient.startCloseup(scene);
-        } catch (RegistryException e) {
-            e.printStackTrace();
+        } catch (Throwable e) {
+            LOGGER.error("Failed to start tracking camera for target {}", targetUuid, e);
+            CMDCamClient.finishImmediately(CamStopReason.INVALID_PACKET);
+            if (player != null)
+                player.sendSystemMessage(Component.translatable("scene.closeup.invalid_packet"));
         }
     }
     

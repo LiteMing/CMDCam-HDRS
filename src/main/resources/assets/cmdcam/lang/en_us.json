@@ -60,6 +60,7 @@
     "scene.closeup.empty": "Close-up scene %s has no camera points",
     "scene.closeup.target_missing": "The close-up target is no longer available",
     "scene.closeup.no_players": "No players matched the viewer selector",
+    "scene.closeup.invalid_packet": "Failed to parse camera packet from server",
     "cam.mode.shoulder": "Shoulder",
     "cam.mode.closeup": "Close-up",
     "mode.shoulder.desc": "camera follows the target from behind its shoulder",

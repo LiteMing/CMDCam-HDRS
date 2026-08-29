@@ -21,7 +21,6 @@ import team.creative.cmdcam.common.packet.StartCloseupPacket;
 import team.creative.cmdcam.common.packet.StartPathPacket;
 import team.creative.cmdcam.common.packet.TeleportPathPacket;
 import team.creative.cmdcam.common.scene.CamScene;
-import team.creative.cmdcam.common.scene.mode.TrackingMode;
 import team.creative.creativecore.common.network.CreativePacket;
 import team.creative.creativecore.common.util.math.vec.Vec3d;
 
@@ -93,7 +92,7 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
         }
         CamScene runtime = scene.copy();
         runtime.setMode("closeup");
-        double heightFactor = (runtime.mode instanceof TrackingMode tracking) ? tracking.defaultHeightFactor : 0.65D;
+        double heightFactor = 0.78D;
         CreativePacket packet = new StartCloseupPacket(runtime, target.getUUID(), 750L, heightFactor);
         for (ServerPlayer player : players)
             CMDCam.NETWORK.sendToClient(packet, player);
@@ -118,13 +117,21 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
         CamScene scene = CamScene.createDefault();
         scene.duration = duration;
         scene.setMode(mode);
-        if (scene.mode instanceof TrackingMode tracking) {
-            Vec3d off = tracking.localOffset;
-            scene.points.add(new CamPoint(off.x, off.y, off.z, 0, 0, 0, tracking.defaultFov));
+        
+        Vec3d off;
+        float fov;
+        double heightFactor;
+        if ("shoulder".equalsIgnoreCase(mode)) {
+            off = new Vec3d(0.8, 0.4, 1.3);
+            fov = 75;
+            heightFactor = 0.65D;
         } else {
-            scene.points.add(new CamPoint(0, 1, 0, 0, 0, 0, 70));
+            off = new Vec3d(0, 0.1, -1.5);
+            fov = 50;
+            heightFactor = 0.78D;
         }
-        double heightFactor = (scene.mode instanceof TrackingMode tracking) ? tracking.defaultHeightFactor : 0.65D;
+        scene.points.add(new CamPoint(off.x, off.y, off.z, 0, 0, 0, fov));
+        
         CreativePacket packet = new StartCloseupPacket(scene, target.getUUID(), 750L, heightFactor);
         for (ServerPlayer player : players)
             CMDCam.NETWORK.sendToClient(packet, player);
@@ -143,6 +150,11 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
     @Override
     public void start(CommandContext<CommandSourceStack> context) throws SceneException {
         CamScene scene = getScene(context);
+        if (scene == null) {
+            String name = StringArgumentType.getString(context, "name");
+            context.getSource().sendFailure(Component.translatable("scenes.load_fail", name));
+            return;
+        }
         if (scene.points.isEmpty()) {
             context.getSource().sendFailure(Component.translatable("scene.create_fail"));
             return;
@@ -154,7 +166,15 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
     
     @Override
     public void teleport(CommandContext<CommandSourceStack> context, int index) {
-        CreativePacket packet = new TeleportPathPacket(getScene(context).points.get(index));
+        CamScene scene = getScene(context);
+        if (scene == null) {
+            String name = StringArgumentType.getString(context, "name");
+            context.getSource().sendFailure(Component.translatable("scenes.load_fail", name));
+            return;
+        }
+        if (index < 0 || index >= scene.points.size())
+            return;
+        CreativePacket packet = new TeleportPathPacket(scene.points.get(index));
         for (ServerPlayer player : getPlayers(context))
             CMDCam.NETWORK.sendToClient(packet, player);
     }

@@ -41,7 +41,9 @@ public class CamRun {
     private boolean finished;
     private int returnStageIndex = -1;
     private boolean returnRequested = false;
+    private boolean returning = false;
     private int targetMissingTicks = 0;
+    private CamStopReason stopReason;
     
     public CamRun(Level level, CamScene scene) {
         Entity camera = Minecraft.getInstance().player;
@@ -123,6 +125,7 @@ public class CamRun {
     public void renderTick(Level level, float deltaTime) {
         if (returnRequested && returnStageIndex >= 0) {
             returnRequested = false;
+            returning = true;
             timer.stageCompleted();
             currentStage = returnStageIndex;
         }
@@ -157,20 +160,31 @@ public class CamRun {
     
     public void gameTick(Level level) {
         timer.tick(running);
-        if (scene.tracking && !returnRequested && returnStageIndex >= 0 && scene.posTarget != null
-                && !(stages.get(currentStage) instanceof CamReturnStage)) {
+        if (scene.tracking && !isReturning() && returnStageIndex >= 0 && scene.posTarget != null) {
             float partial = TickUtils.getFrameTime(level);
             if (!scene.posTarget.pose(level, partial).valid) {
                 if (++targetMissingTicks >= 15)
-                    requestReturn();
+                    requestReturn(CamStopReason.TARGET_LOST);
             } else
                 targetMissingTicks = 0;
         }
     }
     
-    public void requestReturn() {
-        if (returnStageIndex >= 0)
-            returnRequested = true;
+    public boolean isReturning() {
+        return returning || returnRequested || currentStage == returnStageIndex;
+    }
+    
+    public void requestReturn(CamStopReason reason) {
+        if (returnStageIndex < 0 || isReturning())
+            return;
+        
+        this.stopReason = reason;
+        this.returnRequested = true;
+        
+        if (!running) {
+            running = true;
+            timer.resume();
+        }
     }
     
     public CamAttribute[] attributes() {
