@@ -21,8 +21,11 @@ import team.creative.cmdcam.common.packet.StartCloseupPacket;
 import team.creative.cmdcam.common.packet.StartPathPacket;
 import team.creative.cmdcam.common.packet.TeleportPathPacket;
 import team.creative.cmdcam.common.scene.CamScene;
+import team.creative.cmdcam.common.scene.tracking.CamPreset;
+import team.creative.cmdcam.common.scene.tracking.TrackingOptions;
 import team.creative.creativecore.common.network.CreativePacket;
-import team.creative.creativecore.common.util.math.vec.Vec3d;
+
+import static team.creative.cmdcam.common.command.builder.SceneStartCommandBuilder.DEFAULT_PRESET_DURATION;
 
 public class CamCommandProcessorServer implements CamCommandProcessor {
     
@@ -67,74 +70,78 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
     }
     
     @Override
-    public void startCloseup(CommandContext<CommandSourceStack> context) throws SceneException {
+    public void startTracking(CommandContext<CommandSourceStack> context, TrackingOptions options, long durationMs) throws SceneException {
         String name = StringArgumentType.getString(context, "name");
-        CamScene scene = getScene(context);
-        if (scene == null) {
-            context.getSource().sendFailure(Component.translatable("scene.closeup.not_found", name));
+        CamScene stored = getScene(context);
+        if (stored == null) {
+            context.getSource().sendFailure(Component.translatable("scenes.load_fail", name));
             return;
         }
-        if (scene.points.isEmpty()) {
-            context.getSource().sendFailure(Component.translatable("scene.closeup.empty", name));
+        if (stored.points.isEmpty()) {
+            context.getSource().sendFailure(Component.translatable("scene.create_fail"));
             return;
         }
-        Entity target;
-        try {
-            target = EntityArgument.getEntity(context, "target");
-        } catch (CommandSyntaxException e) {
-            context.getSource().sendFailure(Component.translatable("scene.closeup.target_missing"));
+        if (stored.posTarget == null) {
+            context.getSource().sendFailure(Component.translatable("scene.tracking.absolute", name, name));
             return;
         }
+        Entity target = resolveTarget(context);
+        if (target == null)
+            return;
         Collection<ServerPlayer> players = getPlayers(context);
         if (players.isEmpty()) {
             context.getSource().sendFailure(Component.translatable("scene.closeup.no_players"));
             return;
         }
-        CamScene runtime = scene.copy();
-        double heightFactor = 0.78D;
-        CreativePacket packet = new StartCloseupPacket(runtime, target.getUUID(), 750L, heightFactor, "closeup");
+        
+        CamScene runtime = stored.copy();
+        if (durationMs > 0)
+            runtime.duration = durationMs;
+        
+        TrackingOptions runtimeOptions = options.copy();
+        runtimeOptions.modeId = CamPreset.TRACKING;
+        
+        CreativePacket packet = new StartCloseupPacket(runtime, target.getUUID(), CamPreset.TRACKING, runtimeOptions);
         for (ServerPlayer player : players)
             CMDCam.NETWORK.sendToClient(packet, player);
         final int count = players.size();
-        context.getSource().sendSuccess(() -> Component.translatable("scene.closeup.started", name, count), true);
+        context.getSource().sendSuccess(() -> Component.translatable("scene.tracking.started", name, count), true);
     }
     
     @Override
-    public void closeup(CommandContext<CommandSourceStack> context, String mode, long duration) throws SceneException {
-        Entity target;
-        try {
-            target = EntityArgument.getEntity(context, "target");
-        } catch (CommandSyntaxException e) {
-            context.getSource().sendFailure(Component.translatable("scene.closeup.target_missing"));
+    public void startPreset(CommandContext<CommandSourceStack> context, TrackingOptions options, long durationMs) throws SceneException {
+        CamPreset preset = CamPreset.get(options.modeId);
+        Entity target = resolveTarget(context);
+        if (target == null)
             return;
-        }
         Collection<ServerPlayer> players = getPlayers(context);
         if (players.isEmpty()) {
             context.getSource().sendFailure(Component.translatable("scene.closeup.no_players"));
             return;
         }
+        
         CamScene scene = CamScene.createDefault();
-        scene.duration = duration;
+        scene.duration = durationMs > 0 ? durationMs : DEFAULT_PRESET_DURATION;
+        scene.loop = 0;
+        scene.points.add(new CamPoint(preset.offsetX, preset.offsetY, preset.offsetZ, 0, 0, 0, preset.fov));
         
-        Vec3d off;
-        float fov;
-        double heightFactor;
-        if ("shoulder".equalsIgnoreCase(mode)) {
-            off = new Vec3d(0.8, 0.4, 1.3);
-            fov = 75;
-            heightFactor = 0.65D;
-        } else {
-            off = new Vec3d(0, 0.1, -1.5);
-            fov = 50;
-            heightFactor = 0.78D;
-        }
-        scene.points.add(new CamPoint(off.x, off.y, off.z, 0, 0, 0, fov));
+        TrackingOptions runtimeOptions = options.copy();
+        runtimeOptions.modeId = preset.id;
         
-        CreativePacket packet = new StartCloseupPacket(scene, target.getUUID(), 750L, heightFactor, mode);
+        CreativePacket packet = new StartCloseupPacket(scene, target.getUUID(), preset.id, runtimeOptions);
         for (ServerPlayer player : players)
             CMDCam.NETWORK.sendToClient(packet, player);
         final int count = players.size();
-        context.getSource().sendSuccess(() -> Component.translatable("scene.closeup.started", mode, count), true);
+        context.getSource().sendSuccess(() -> Component.translatable("scene.closeup.started", preset.id, count), true);
+    }
+    
+    private Entity resolveTarget(CommandContext<CommandSourceStack> context) {
+        try {
+            return EntityArgument.getEntity(context, "target");
+        } catch (CommandSyntaxException e) {
+            context.getSource().sendFailure(Component.translatable("scene.closeup.target_missing"));
+            return null;
+        }
     }
     
     public Collection<ServerPlayer> getPlayers(CommandContext<CommandSourceStack> context) {

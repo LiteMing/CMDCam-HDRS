@@ -41,11 +41,41 @@ public class CamTargetPose {
         return new Vec3d(eyePosition.x, feetY + bbHeight * heightFactor, eyePosition.z);
     }
     
+    /**
+     * Transforms a local offset into world space using only the horizontal facing. Kept for compatibility, the Y component is always zero.
+     * <p>
+     * Local axis convention: {@code X = right}, {@code Y = up}, {@code Z = behind}, {@code -Z = in front} of the target.
+     */
     public Vec3d localToWorld(double localX, double localZ) {
-        double rad = Math.toRadians(Mth.wrapDegrees(bodyYaw));
+        return localToWorld(localX, 0, localZ, bodyYaw, 0);
+    }
+    
+    public Vec3d localToWorld(double localX, double localY, double localZ) {
+        return localToWorld(localX, localY, localZ, bodyYaw, pitch);
+    }
+    
+    /**
+     * Applies pitch first (around the local X axis) and afterwards yaw (around the world Y axis).
+     * <p>
+     * Pitch uses the Minecraft convention where a negative value means looking up. A target looking up therefore moves a point behind it down and a point in
+     * front of it up, which is exactly the way the camera should orbit around the head.
+     */
+    public Vec3d localToWorld(double localX, double localY, double localZ, float yaw, float pitch) {
+        double pitchRad = Math.toRadians(Mth.wrapDegrees(pitch));
+        double pitchCos = Math.cos(pitchRad);
+        double pitchSin = Math.sin(pitchRad);
+        
+        double pitchedY = localY * pitchCos + localZ * pitchSin;
+        double pitchedZ = -localY * pitchSin + localZ * pitchCos;
+        
+        return localToWorldYaw(localX, pitchedY, pitchedZ, yaw);
+    }
+    
+    public Vec3d localToWorldYaw(double localX, double localY, double localZ, float yaw) {
+        double rad = Math.toRadians(Mth.wrapDegrees(yaw));
         double cos = Math.cos(rad);
         double sin = Math.sin(rad);
-        return new Vec3d(-localX * cos + localZ * sin, 0, -localX * sin - localZ * cos);
+        return new Vec3d(-localX * cos + localZ * sin, localY, -localX * sin - localZ * cos);
     }
     
     public void worldToLocal(Vec3d offset) {

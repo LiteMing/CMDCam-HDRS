@@ -18,6 +18,7 @@ import team.creative.cmdcam.common.scene.attribute.CamAttribute;
 import team.creative.cmdcam.common.scene.mode.CamMode;
 import team.creative.cmdcam.common.scene.mode.DefaultMode;
 import team.creative.cmdcam.common.scene.run.CamRun;
+import team.creative.cmdcam.common.scene.tracking.TrackingOptions;
 import team.creative.cmdcam.common.target.CamTarget;
 import team.creative.creativecore.common.util.math.vec.Vec1d;
 import team.creative.creativecore.common.util.math.vec.Vec3d;
@@ -60,6 +61,8 @@ public class CamScene {
     public boolean tracking = false;
     public double targetHeightFactor = 0.65D;
     public long targetReturnDuration = 750L;
+    /** runtime configuration of the entity bound camera, only present while {@link #tracking} is true */
+    public TrackingOptions trackingOptions;
     
     @OnlyIn(Dist.CLIENT)
     public CamRun run;
@@ -100,9 +103,17 @@ public class CamScene {
     }
     
     public CamScene bindTracking(UUID uuid, double heightFactor, long returnDuration) {
+        TrackingOptions options = new TrackingOptions();
+        options.targetHeightFactor = heightFactor;
+        options.returnDurationMs = returnDuration;
+        return bindTracking(uuid, options);
+    }
+    
+    public CamScene bindTracking(UUID uuid, TrackingOptions options) {
         this.tracking = true;
-        this.targetHeightFactor = heightFactor;
-        this.targetReturnDuration = returnDuration;
+        this.trackingOptions = options != null ? options : new TrackingOptions();
+        this.targetHeightFactor = this.trackingOptions.heightFactorOrDefault(targetHeightFactor);
+        this.targetReturnDuration = this.trackingOptions.returnDurationOrDefault(targetReturnDuration);
         this.lookTarget = new CamTarget.EntityTarget(uuid);
         this.posTarget = new CamTarget.EntityTarget(uuid);
         return this;
@@ -253,6 +264,7 @@ public class CamScene {
         this.tracking = scene.tracking;
         this.targetHeightFactor = scene.targetHeightFactor;
         this.targetReturnDuration = scene.targetReturnDuration;
+        this.trackingOptions = scene.trackingOptions;
     }
     
     public void setMode(String mode) {

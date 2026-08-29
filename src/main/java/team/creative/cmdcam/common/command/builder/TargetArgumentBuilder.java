@@ -53,7 +53,7 @@ public class TargetArgumentBuilder extends ArgumentBuilder<CommandSourceStack, T
             try {
                 processor.setTarget(x, null, look);
             } catch (SceneException e) {
-                x.getSource().sendFailure(Component.translatable(e.getMessage()));
+                x.getSource().sendFailure(e.getComponent());
             }
             processor.markDirty(x);
             x.getSource().sendSuccess(() -> Component.translatable(translatePrefix() + "remove"), false);
@@ -62,7 +62,7 @@ public class TargetArgumentBuilder extends ArgumentBuilder<CommandSourceStack, T
             try {
                 processor.setTarget(x, new CamTarget.SelfTarget(), look);
             } catch (SceneException e) {
-                x.getSource().sendFailure(Component.translatable(e.getMessage()));
+                x.getSource().sendFailure(e.getComponent());
             }
             processor.markDirty(x);
             x.getSource().sendSuccess(() -> Component.translatable(translatePrefix() + "self"), false);
@@ -72,7 +72,7 @@ public class TargetArgumentBuilder extends ArgumentBuilder<CommandSourceStack, T
             try {
                 processor.setTarget(x, new CamTarget.PlayerTarget(player), look);
             } catch (SceneException e) {
-                x.getSource().sendFailure(Component.translatable(e.getMessage()));
+                x.getSource().sendFailure(e.getComponent());
             }
             processor.markDirty(x);
             x.getSource().sendSuccess(() -> Component.translatable(translatePrefix() + "player", player.getScoreboardName()), false);
@@ -82,7 +82,7 @@ public class TargetArgumentBuilder extends ArgumentBuilder<CommandSourceStack, T
             try {
                 processor.setTarget(x, new CamTarget.EntityTarget(entity), look);
             } catch (SceneException e) {
-                x.getSource().sendFailure(Component.translatable(e.getMessage()));
+                x.getSource().sendFailure(e.getComponent());
             }
             processor.markDirty(x);
             x.getSource().sendSuccess(() -> Component.translatable(translatePrefix() + "entity", entity.getStringUUID()), false);
@@ -92,7 +92,7 @@ public class TargetArgumentBuilder extends ArgumentBuilder<CommandSourceStack, T
             try {
                 processor.setTarget(x, new CamTarget.BlockTarget(pos), look);
             } catch (SceneException e) {
-                x.getSource().sendFailure(Component.translatable(e.getMessage()));
+                x.getSource().sendFailure(e.getComponent());
             }
             processor.markDirty(x);
             x.getSource().sendSuccess(() -> Component.translatable(translatePrefix() + "pos", pos.toShortString()), false);
@@ -104,7 +104,7 @@ public class TargetArgumentBuilder extends ArgumentBuilder<CommandSourceStack, T
                 try {
                     processor.selectTarget(x, look);
                 } catch (SceneException e) {
-                    x.getSource().sendFailure(Component.translatable(e.getMessage()));
+                    x.getSource().sendFailure(e.getComponent());
                 }
                 x.getSource().sendSuccess(() -> Component.translatable(translatePrefix() + "select"), false);
                 return 0;

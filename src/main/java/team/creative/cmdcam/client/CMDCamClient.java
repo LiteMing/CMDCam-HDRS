@@ -145,7 +145,7 @@ public class CMDCamClient {
                     x.getSource().sendSuccess(() -> Component.translatable("scenes.save", pathArg), false);
                 }
             } catch (SceneException e) {
-                x.getSource().sendFailure(Component.translatable(e.getMessage()));
+                x.getSource().sendFailure(e.getComponent());
             }
             return 0;
         }))).then(new PointArgumentBuilder("follow_center", (x, y) -> targetMarker = y, PROCESSOR).executes(x -> {

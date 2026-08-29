@@ -10,6 +10,7 @@ import net.minecraft.world.level.Level;
 import team.creative.cmdcam.client.SceneException;
 import team.creative.cmdcam.common.math.point.CamPoint;
 import team.creative.cmdcam.common.scene.CamScene;
+import team.creative.cmdcam.common.scene.tracking.TrackingOptions;
 import team.creative.cmdcam.common.target.CamTarget;
 import team.creative.cmdcam.common.target.CamTargetPose;
 import team.creative.creativecore.common.util.math.vec.Vec3d;
@@ -75,9 +76,16 @@ public interface CamCommandProcessor {
         return false;
     }
     
-    public default void startCloseup(CommandContext<CommandSourceStack> context) throws SceneException {}
+    /** Plays a saved path as it was authored, no entity binding. */
+    public default void startPath(CommandContext<CommandSourceStack> context) throws SceneException {
+        start(context);
+    }
     
-    public default void closeup(CommandContext<CommandSourceStack> context, String mode, long duration) throws SceneException {}
+    /** Binds the control points of a saved path to an entity. */
+    public default void startTracking(CommandContext<CommandSourceStack> context, TrackingOptions options, long durationMs) throws SceneException {}
+    
+    /** Starts one of the built in entity bound presets. */
+    public default void startPreset(CommandContext<CommandSourceStack> context, TrackingOptions options, long durationMs) throws SceneException {}
     
     public void start(CommandContext<CommandSourceStack> context) throws SceneException;
     

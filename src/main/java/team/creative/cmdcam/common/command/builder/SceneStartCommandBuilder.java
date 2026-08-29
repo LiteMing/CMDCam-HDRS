@@ -1,8 +1,14 @@
 package team.creative.cmdcam.common.command.builder;
 
+import java.util.function.Predicate;
+
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.ArgumentType;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 
 import net.minecraft.commands.CommandSourceStack;
@@ -12,105 +18,207 @@ import net.minecraft.network.chat.Component;
 import team.creative.cmdcam.client.SceneException;
 import team.creative.cmdcam.common.command.CamCommandProcessor;
 import team.creative.cmdcam.common.command.argument.DurationArgument;
-import team.creative.cmdcam.common.scene.CamScene;
+import team.creative.cmdcam.common.scene.tracking.CamPreset;
+import team.creative.cmdcam.common.scene.tracking.TrackingOptions;
 
+/**
+ * Builds the unified {@code start} command tree.
+ * <p>
+ * Mental model: {@code start = play}, {@code path | tracking | preset = what to play}, {@code closeup | shoulder = which built in preset}.
+ */
 public class SceneStartCommandBuilder {
     
+    public static final long DEFAULT_PRESET_DURATION = 8000L;
+    
+    private static final Predicate<CommandSourceStack> PERMISSION_2 = source -> source.hasPermission(2);
+    private static final String[] PRESETS = new String[] { CamPreset.CLOSEUP, CamPreset.SHOULDER };
+    
     public static void start(ArgumentBuilder<CommandSourceStack, ?> origin, CamCommandProcessor processor) {
-        boolean server = processor.requiresSceneName();
-        ArgumentBuilder<CommandSourceStack, ?> startO = Commands.literal(server ? "play" : "start");
-        ArgumentBuilder<CommandSourceStack, ?> start = startO;
-        
-        if (processor.requiresPlayer())
-            start = Commands.argument("players", EntityArgument.players());
-        else if (processor.requiresSceneName())
-            start = Commands.argument("name", StringArgumentType.string());
-        
-        start.executes((x) -> {
-            try {
-                processor.start(x);
-            } catch (SceneException e) {
-                x.getSource().sendFailure(Component.translatable(e.getMessage()));
-            }
-            return 0;
-        }).then(Commands.argument("duration", DurationArgument.duration()).executes((x) -> {
-            try {
-                long duration = DurationArgument.getDuration(x, "duration");
-                if (duration > 0)
-                    processor.getScene(x).duration = duration;
-                processor.markDirty(x);
-                processor.start(x);
-            } catch (SceneException e) {
-                x.getSource().sendFailure(Component.translatable(e.getMessage()));
-            }
-            return 0;
-        }).then(Commands.argument("loop", IntegerArgumentType.integer(-1)).executes((x) -> {
-            try {
-                CamScene scene = processor.getScene(x);
-                long duration = DurationArgument.getDuration(x, "duration");
-                if (duration > 0)
-                    scene.duration = duration;
-                scene.loop = IntegerArgumentType.getInteger(x, "loop");
-                processor.markDirty(x);
-                processor.start(x);
-            } catch (SceneException e) {
-                x.getSource().sendFailure(Component.translatable(e.getMessage()));
-            }
-            return 0;
-        })));
-        
-        if (processor.requiresSceneName())
-            origin.then(startO.then(Commands.argument("name", StringArgumentType.string()).then(start)));
-        else {
-            if (processor.requiresPlayer())
-                origin.then(startO.then(start));
-            else
-                origin.then(startO);
+        if (!processor.requiresSceneName()) { // /cam start [duration] [loop]
+            origin.then(durationLoop(Commands.literal("start"), processor, false, x -> processor.start(x)));
+            return;
         }
         
-        if (server && processor.supportsCloseup()) {
-            ArgumentBuilder<CommandSourceStack, ?> closeupStart = Commands.literal("start")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.argument("name", StringArgumentType.string())
-                    .then(Commands.argument("target", EntityArgument.entity())
-                        .then(Commands.argument("players", EntityArgument.players())
-                            .executes((x) -> {
-                                try {
-                                    processor.startCloseup(x);
-                                } catch (SceneException e) {
-                                    x.getSource().sendFailure(Component.translatable(e.getMessage()));
-                                }
-                                return 0;
-                            }))));
-            origin.then(closeupStart);
+        LiteralArgumentBuilder<CommandSourceStack> start = Commands.literal("start");
+        
+        // start path <scene> <players> [duration] [loop]
+        ArgumentBuilder<CommandSourceStack, ?> pathName = Commands.argument("name", StringArgumentType.string());
+        pathName.then(durationLoop(Commands.argument("players", EntityArgument.players()), processor, false, x -> processor.startPath(x)));
+        start.then(Commands.literal("path").then(pathName));
+        
+        // start tracking <scene> <target> <players> [duration] [distance_scale] [fov] [damping] [pitch_follow]
+        ArgumentBuilder<CommandSourceStack, ?> trackingTarget = Commands.argument("target", EntityArgument.entity());
+        trackingTarget.then(options(Commands.argument("players", EntityArgument.players()), processor, CamPreset.TRACKING, false));
+        start.then(Commands.literal("tracking").requires(PERMISSION_2).then(Commands.argument("name", StringArgumentType.string()).then(trackingTarget)));
+        
+        // start preset <closeup|shoulder> <target> <players> [duration] [distance] [fov] [damping] [pitch_follow]
+        LiteralArgumentBuilder<CommandSourceStack> preset = Commands.literal("preset");
+        for (String id : PRESETS) {
+            ArgumentBuilder<CommandSourceStack, ?> presetTarget = Commands.argument("target", EntityArgument.entity());
+            presetTarget.then(options(Commands.argument("players", EntityArgument.players()), processor, id, true));
+            preset.then(Commands.literal(id).requires(PERMISSION_2).then(presetTarget));
         }
+        start.then(preset);
+        
+        // deprecated: start <scene> <target> <players>, replaced by start tracking
+        if (processor.supportsCloseup()) {
+            ArgumentBuilder<CommandSourceStack, ?> legacyTarget = Commands.argument("target", EntityArgument.entity());
+            legacyTarget.then(Commands.argument("players", EntityArgument.players()).executes(x -> {
+                try {
+                    warnDeprecated(x);
+                    processor.startTracking(x, new TrackingOptions(CamPreset.TRACKING), 0L);
+                } catch (SceneException e) {
+                    x.getSource().sendFailure(e.getComponent());
+                }
+                return 0;
+            }));
+            start.then(Commands.argument("name", StringArgumentType.string()).requires(PERMISSION_2).then(legacyTarget));
+        }
+        
+        origin.then(start);
+        
+        // deprecated: play <scene> <players> [duration] [loop], replaced by start path
+        ArgumentBuilder<CommandSourceStack, ?> playName = Commands.argument("name", StringArgumentType.string());
+        playName.then(durationLoop(Commands.argument("players", EntityArgument.players()), processor, true, x -> processor.startPath(x)));
+        origin.then(Commands.literal("play").then(playName));
     }
     
+    /** Deprecated top level shortcuts for the two built in presets. */
     public static void quick(ArgumentBuilder<CommandSourceStack, ?> origin, CamCommandProcessor processor) {
         if (!processor.supportsCloseup())
             return;
-        quickCommand(origin, processor, "closeup", "closeup");
-        quickCommand(origin, processor, "shoulder", "shoulder");
+        for (String id : PRESETS)
+            origin.then(Commands.literal(id).requires(PERMISSION_2)
+                .then(Commands.argument("target", EntityArgument.entity())
+                    .then(Commands.argument("players", EntityArgument.players())
+                        .executes(x -> quickPreset(x, processor, id, DEFAULT_PRESET_DURATION))
+                        .then(Commands.argument("duration", DurationArgument.duration())
+                            .executes(x -> quickPreset(x, processor, id, durationOr(x, DEFAULT_PRESET_DURATION)))))));
     }
     
-    private static void quickCommand(ArgumentBuilder<CommandSourceStack, ?> origin, CamCommandProcessor processor, String literal, String modeId) {
-        ArgumentBuilder<CommandSourceStack, ?> cmd = Commands.literal(literal)
-            .requires(source -> source.hasPermission(2))
-            .then(Commands.argument("target", EntityArgument.entity())
-                .then(Commands.argument("players", EntityArgument.players())
-                    .executes(x -> executeQuick(x, processor, modeId, 8000L))
-                    .then(Commands.argument("duration", DurationArgument.duration())
-                        .executes(x -> executeQuick(x, processor, modeId, DurationArgument.getDuration(x, "duration"))))));
-        origin.then(cmd);
+    private static ArgumentBuilder<CommandSourceStack, ?> durationLoop(ArgumentBuilder<CommandSourceStack, ?> node, CamCommandProcessor processor,
+            boolean deprecated, SceneStarter starter) {
+        node.executes(x -> runDurationLoop(x, processor, deprecated, starter));
+        node.then(Commands.argument("duration", DurationArgument.duration())
+            .executes(x -> runDurationLoop(x, processor, deprecated, starter))
+            .then(Commands.argument("loop", IntegerArgumentType.integer(-1))
+                .executes(x -> runDurationLoop(x, processor, deprecated, starter))));
+        return node;
     }
     
-    private static int executeQuick(CommandContext<CommandSourceStack> x, CamCommandProcessor processor, String modeId, long duration) {
+    private static int runDurationLoop(CommandContext<CommandSourceStack> x, CamCommandProcessor processor, boolean deprecated, SceneStarter starter) {
         try {
-            processor.closeup(x, modeId, duration);
+            if (deprecated)
+                warnDeprecated(x);
+            
+            Long duration = optional(x, "duration", long.class);
+            if (duration != null && duration > 0) {
+                processor.getScene(x).duration = duration;
+                processor.markDirty(x);
+            }
+            Integer loop = optional(x, "loop", Integer.class);
+            if (loop != null) {
+                processor.getScene(x).loop = loop;
+                processor.markDirty(x);
+            }
+            
+            starter.start(x);
         } catch (SceneException e) {
-            x.getSource().sendFailure(Component.translatable(e.getMessage()));
+            x.getSource().sendFailure(e.getComponent());
         }
         return 0;
+    }
+    
+    /** Appends the optional camera parameters in a fixed order, every level accepts the same command so any suffix can be left out. */
+    private static ArgumentBuilder<CommandSourceStack, ?> options(ArgumentBuilder<CommandSourceStack, ?> node, CamCommandProcessor processor, String modeId,
+            boolean absoluteDistance) {
+        OptionStarter starter = CamPreset.TRACKING.equals(modeId) ? processor::startTracking : processor::startPreset;
+        Command<CommandSourceStack> command = x -> runOptions(x, modeId, absoluteDistance, starter);
+        
+        node.executes(command);
+        ArgumentBuilder<CommandSourceStack, ?> current = node;
+        current = append(current, "duration", DurationArgument.duration(), command);
+        current = append(current, absoluteDistance ? "distance" : "distance_scale", DoubleArgumentType.doubleArg(), command);
+        current = append(current, "fov", DoubleArgumentType.doubleArg(), command);
+        current = append(current, "damping", DoubleArgumentType.doubleArg(), command);
+        current = append(current, "pitch_follow", DoubleArgumentType.doubleArg(), command);
+        return node;
+    }
+    
+    private static int runOptions(CommandContext<CommandSourceStack> x, String modeId, boolean absoluteDistance, OptionStarter starter) {
+        try {
+            TrackingOptions options = readOptions(x, modeId, absoluteDistance);
+            options.validate();
+            starter.start(x, options, durationOr(x, 0L));
+        } catch (SceneException e) {
+            x.getSource().sendFailure(e.getComponent());
+        }
+        return 0;
+    }
+    
+    private static int quickPreset(CommandContext<CommandSourceStack> x, CamCommandProcessor processor, String presetId, long duration) {
+        try {
+            warnDeprecated(x);
+            TrackingOptions options = new TrackingOptions(presetId);
+            options.validate();
+            processor.startPreset(x, options, duration > 0 ? duration : DEFAULT_PRESET_DURATION);
+        } catch (SceneException e) {
+            x.getSource().sendFailure(e.getComponent());
+        }
+        return 0;
+    }
+    
+    private static TrackingOptions readOptions(CommandContext<CommandSourceStack> x, String modeId, boolean absoluteDistance) {
+        TrackingOptions options = new TrackingOptions(modeId);
+        if (absoluteDistance)
+            options.distance = optional(x, "distance", Double.class);
+        else
+            options.distanceScale = optional(x, "distance_scale", Double.class);
+        options.fov = optional(x, "fov", Double.class);
+        options.dampingMs = optional(x, "damping", Double.class);
+        options.pitchFollow = optional(x, "pitch_follow", Double.class);
+        return options;
+    }
+    
+    private static ArgumentBuilder<CommandSourceStack, ?> append(ArgumentBuilder<CommandSourceStack, ?> parent, String name, ArgumentType<?> type,
+            Command<CommandSourceStack> command) {
+        ArgumentBuilder<CommandSourceStack, ?> argument = Commands.argument(name, type);
+        argument.executes(command);
+        parent.then(argument);
+        return argument;
+    }
+    
+    private static void warnDeprecated(CommandContext<CommandSourceStack> x) {
+        x.getSource().sendSystemMessage(Component.translatable("scene.start.deprecated"));
+    }
+    
+    private static long durationOr(CommandContext<CommandSourceStack> x, long fallback) {
+        Long duration = optional(x, "duration", long.class);
+        return duration != null && duration > 0 ? duration : fallback;
+    }
+    
+    /** Reads an optional argument, {@code null} when the node was not part of the parsed command. */
+    private static <T> T optional(CommandContext<CommandSourceStack> x, String name, Class<T> type) {
+        try {
+            T value = x.getArgument(name, type);
+            return value;
+        } catch (IllegalArgumentException | ClassCastException e) {
+            return null;
+        }
+    }
+    
+    @FunctionalInterface
+    private interface SceneStarter {
+        
+        void start(CommandContext<CommandSourceStack> context) throws SceneException;
+        
+    }
+    
+    @FunctionalInterface
+    private interface OptionStarter {
+        
+        void start(CommandContext<CommandSourceStack> context, TrackingOptions options, long durationMs) throws SceneException;
+        
     }
     
 }

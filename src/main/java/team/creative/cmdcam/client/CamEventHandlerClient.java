@@ -211,7 +211,7 @@ public class CamEventHandlerClient {
                         try {
                             CMDCamClient.start(CMDCamClient.createScene());
                         } catch (SceneException e) {
-                            MC.player.sendSystemMessage(Component.translatable(e.getMessage()));
+                            MC.player.sendSystemMessage(e.getComponent());
                         }
                 }
                 
