@@ -96,12 +96,35 @@ public class CamTargetPose {
     }
     
     public void worldToLocal(Vec3d offset) {
-        double rad = Math.toRadians(Mth.wrapDegrees(bodyYaw));
-        double cos = Math.cos(rad);
-        double sin = Math.sin(rad);
-        double ox = offset.x;
-        double oz = offset.z;
-        offset.x = -cos * ox - sin * oz;
-        offset.z = sin * ox - cos * oz;
+        worldToLocal(offset, bodyYaw, 0.0F);
+    }
+    
+    /**
+     * Exact inverse of {@link #localToWorld(double, double, double, float, float)}.
+     * Inverts world-space yaw rotation first, then inverts local pitch rotation.
+     */
+    public void worldToLocal(Vec3d offset, float yaw, float pitch) {
+        // Inverse yaw: forward is [-X*cos + Z*sin, Y, -X*sin - Z*cos]
+        // Inverting gives:
+        double yawRad = Math.toRadians(Mth.wrapDegrees(yaw));
+        double yawCos = Math.cos(yawRad);
+        double yawSin = Math.sin(yawRad);
+        
+        double worldX = offset.x;
+        double worldZ = offset.z;
+        
+        double pitchedX = -yawCos * worldX - yawSin * worldZ;
+        double pitchedZ = yawSin * worldX - yawCos * worldZ;
+        double pitchedY = offset.y;
+        
+        // Inverse pitch: forward is [Y*cos + Z*sin, -Y*sin + Z*cos]
+        // Inverting rotation by -pitch:
+        double pitchRad = Math.toRadians(Mth.wrapDegrees(pitch));
+        double pitchCos = Math.cos(pitchRad);
+        double pitchSin = Math.sin(pitchRad);
+        
+        offset.x = pitchedX;
+        offset.y = pitchedY * pitchCos - pitchedZ * pitchSin;
+        offset.z = pitchedY * pitchSin + pitchedZ * pitchCos;
     }
 }

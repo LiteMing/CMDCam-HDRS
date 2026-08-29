@@ -8,6 +8,7 @@ import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import team.creative.cmdcam.client.CamEventHandlerClient;
+import team.creative.cmdcam.client.SceneException;
 import team.creative.cmdcam.common.math.point.CamPoint;
 import team.creative.cmdcam.common.scene.CamScene;
 import team.creative.cmdcam.common.scene.run.CamRun;
@@ -102,14 +103,33 @@ public abstract class TrackingMode extends OutsideMode {
         return false;
     }
     
-    public void compensateSmoothEntryStart(CamPoint point, TrackingOptions options) {
-        if (options == null)
-            return;
+    /**
+     * Converts a world-space point (e.g. player camera position) into an exact inverse local coordinate
+     * corresponding to the forward calculation in {@link #calculate}.
+     */
+    public void makeSmoothEntryRelative(Level level, float partialTicks, CamPoint point) throws SceneException {
+        TrackingOptions options = options();
+        CamTargetPose pose = scene.posTarget != null ? scene.posTarget.pose(level, partialTicks) : null;
+        if (pose == null || !pose.valid)
+            throw new SceneException("scene.follow.not_found");
+        
+        double heightFactor = options.heightFactorOrDefault(defaultHeightFactor);
+        Vec3d anchor = pose.anchor(heightFactor);
+        if (anchor == null)
+            throw new SceneException("scene.follow.not_found");
+        
+        float appliedYaw = pose.blendYaw(options.yawFollowOrDefault(defaultYawFollow));
+        float appliedPitch = Mth.clamp((float) (pose.pitch * options.pitchFollowOrDefault(defaultPitchFollow)), -MAX_APPLIED_PITCH, MAX_APPLIED_PITCH);
+        
+        point.sub(anchor);
+        pose.worldToLocal(point, appliedYaw, appliedPitch);
+        
         double scale = usesTemplatePath()
             ? options.distanceScaleOrDefault(1.0D)
             : options.distance != null
                 ? options.distanceOrDefault(defaultDistance) / Math.max(defaultDistance, 0.0001D)
                 : 1.0D;
+        
         point.x = (point.x - options.offsetXOrZero()) / Math.max(scale, 0.0001D);
         point.y -= options.offsetYOrZero();
         point.z = (point.z - options.offsetZOrZero()) / Math.max(scale, 0.0001D);
