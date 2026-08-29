@@ -261,10 +261,6 @@ public class CMDCamClient {
         cancelPendingStart();
         if (playing != null)
             finishImmediately(CamStopReason.OVERWRITE);
-        if (scene.points.isEmpty())
-            return;
-        if (scene.points.size() == 1)
-            scene.points.add(scene.points.get(0));
         startNow(scene);
     }
     
@@ -303,12 +299,20 @@ public class CMDCamClient {
     /**
      * Actually creates the {@code CamRun} and starts playback.
      *
-     * <p><b>Private invariant:</b> callers must have already cancelled any pending start
-     * and finished any previous run before calling this method.
+     * <p>Validates the scene and normalizes single-point paths before assigning
+     * {@link #playing}. Returns {@code true} on success, {@code false} if the scene
+     * is null, empty, or has no points.
      */
-    private static void startNow(CamScene scene) {
+    private static boolean startNow(CamScene scene) {
+        if (scene == null || scene.points == null || scene.points.isEmpty()) {
+            CMDCam.LOGGER.warn("Refusing to start camera scene without points");
+            return false;
+        }
+        if (scene.points.size() == 1)
+            scene.points.add(scene.points.get(0).copy());
         playing = scene;
         playing.play();
+        return true;
     }
     
     // ---------------------------------------------------------------------------

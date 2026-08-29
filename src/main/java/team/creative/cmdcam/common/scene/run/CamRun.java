@@ -153,10 +153,10 @@ public class CamRun {
             else {
                 currentStage++;
                 if (currentStage < stages.size()) {
-                    // Record natural-end reason as soon as we step into the return stage so
-                    // stopReason() is never null while isReturning() is true.
-                    if (stopReason == null)
+                    if (currentStage == returnStageIndex && stopReason == null) {
                         stopReason = CamStopReason.NATURAL_END;
+                        returning = true;
+                    }
                     stage = stages.get(currentStage);
                     stage.start();
                     time = 0;

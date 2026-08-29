@@ -12,7 +12,6 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import team.creative.cmdcam.CMDCam;
 import team.creative.cmdcam.client.SceneException;
@@ -98,11 +97,6 @@ public class CamCommandProcessorServer implements CamCommandProcessor {
         CamScene runtime = stored.copy();
         if (durationMs > 0)
             runtime.duration = durationMs;
-        // Record the target's current body yaw so FollowPathMode can compute the correct
-        // rotation delta from the very first frame on the client.
-        float yaw = target instanceof LivingEntity living ? living.yBodyRot : target.getYRot();
-        runtime.trackingReferenceYaw = yaw;
-        
         TrackingOptions runtimeOptions = options.copy();
         runtimeOptions.modeId = CamPreset.TRACKING;
         
