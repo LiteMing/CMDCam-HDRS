@@ -26,6 +26,8 @@ public class TrackingOptions {
     public static final double MAX_PITCH_FOLLOW = 1.0D;
     public static final double MIN_YAW_FOLLOW = 0.0D;
     public static final double MAX_YAW_FOLLOW = 1.0D;
+    public static final double MIN_OFFSET = -64.0D;
+    public static final double MAX_OFFSET = 64.0D;
     public static final long MIN_TRANSITION_DURATION_MS = 0L;
     public static final long MAX_TRANSITION_DURATION_MS = 10000L;
     public static final long DEFAULT_RETURN_DURATION_MS = 750L;
@@ -55,6 +57,15 @@ public class TrackingOptions {
     
     /** height anchor on the target bounding box, {@code 0..1} */
     public Double targetHeightFactor;
+    
+    /** local camera X offset (left/right, positive = right of target) */
+    public Double offsetX;
+    
+    /** local camera Y offset (up/down, positive = above target) */
+    public Double offsetY;
+    
+    /** local camera Z offset (forward/backward, positive = behind target, negative = in front) */
+    public Double offsetZ;
     
     /** entry transition style */
     public CamTransitionStyle enterStyle = CamTransitionStyle.SMOOTH;
@@ -88,6 +99,9 @@ public class TrackingOptions {
         options.pitchFollow = pitchFollow;
         options.yawFollow = yawFollow;
         options.targetHeightFactor = targetHeightFactor;
+        options.offsetX = offsetX;
+        options.offsetY = offsetY;
+        options.offsetZ = offsetZ;
         options.enterStyle = enterStyle;
         options.exitStyle = exitStyle;
         options.enterDurationMs = enterDurationMs;
@@ -124,6 +138,18 @@ public class TrackingOptions {
         return targetHeightFactor != null ? Mth.clamp(targetHeightFactor, 0.0D, 1.0D) : fallback;
     }
     
+    public double offsetXOrZero() {
+        return offsetX != null ? clamp(offsetX, MIN_OFFSET, MAX_OFFSET) : 0.0D;
+    }
+    
+    public double offsetYOrZero() {
+        return offsetY != null ? clamp(offsetY, MIN_OFFSET, MAX_OFFSET) : 0.0D;
+    }
+    
+    public double offsetZOrZero() {
+        return offsetZ != null ? clamp(offsetZ, MIN_OFFSET, MAX_OFFSET) : 0.0D;
+    }
+    
     public long enterDurationOrDefault(long fallback) {
         return enterDurationMs != null && enterDurationMs >= MIN_TRANSITION_DURATION_MS && enterDurationMs <= MAX_TRANSITION_DURATION_MS
                 ? enterDurationMs : fallback;
@@ -157,6 +183,12 @@ public class TrackingOptions {
             throw new SceneException("scene.tracking.invalid_yaw_follow", MIN_YAW_FOLLOW, MAX_YAW_FOLLOW);
         if (invalid(targetHeightFactor, 0.0D, 1.0D))
             throw new SceneException("scene.tracking.invalid_height_factor", 0.0D, 1.0D);
+        if (invalid(offsetX, MIN_OFFSET, MAX_OFFSET))
+            throw new SceneException("scene.tracking.invalid_offset_x", MIN_OFFSET, MAX_OFFSET);
+        if (invalid(offsetY, MIN_OFFSET, MAX_OFFSET))
+            throw new SceneException("scene.tracking.invalid_offset_y", MIN_OFFSET, MAX_OFFSET);
+        if (invalid(offsetZ, MIN_OFFSET, MAX_OFFSET))
+            throw new SceneException("scene.tracking.invalid_offset_z", MIN_OFFSET, MAX_OFFSET);
         if (enterDurationMs != null && (enterDurationMs < MIN_TRANSITION_DURATION_MS || enterDurationMs > MAX_TRANSITION_DURATION_MS))
             throw new SceneException("scene.tracking.invalid_enter_duration", MIN_TRANSITION_DURATION_MS, MAX_TRANSITION_DURATION_MS);
         if (returnDurationMs < MIN_TRANSITION_DURATION_MS || returnDurationMs > MAX_TRANSITION_DURATION_MS)
@@ -180,6 +212,12 @@ public class TrackingOptions {
             nbt.putDouble("yaw_follow", yawFollow);
         if (targetHeightFactor != null)
             nbt.putDouble("height_factor", targetHeightFactor);
+        if (offsetX != null)
+            nbt.putDouble("offset_x", offsetX);
+        if (offsetY != null)
+            nbt.putDouble("offset_y", offsetY);
+        if (offsetZ != null)
+            nbt.putDouble("offset_z", offsetZ);
         if (enterStyle != null)
             nbt.putString("enter_style", enterStyle.getId());
         if (exitStyle != null)
@@ -204,6 +242,9 @@ public class TrackingOptions {
         options.pitchFollow = nbt.contains("pitch_follow") ? nbt.getDouble("pitch_follow") : null;
         options.yawFollow = nbt.contains("yaw_follow") ? nbt.getDouble("yaw_follow") : null;
         options.targetHeightFactor = nbt.contains("height_factor") ? nbt.getDouble("height_factor") : null;
+        options.offsetX = nbt.contains("offset_x") ? nbt.getDouble("offset_x") : null;
+        options.offsetY = nbt.contains("offset_y") ? nbt.getDouble("offset_y") : null;
+        options.offsetZ = nbt.contains("offset_z") ? nbt.getDouble("offset_z") : null;
         if (nbt.contains("enter_style"))
             options.enterStyle = CamTransitionStyle.fromString(nbt.getString("enter_style"));
         if (nbt.contains("exit_style"))

@@ -131,7 +131,10 @@ public abstract class TrackingMode extends OutsideMode {
         
         if (usesTemplatePath()) {
             double scale = options.distanceScaleOrDefault(1.0D);
-            Vec3d offset = pose.localToWorld(local.x * scale, local.y, local.z * scale, appliedYaw, appliedPitch);
+            double localX = local.x * scale + options.offsetXOrZero();
+            double localY = local.y + options.offsetYOrZero();
+            double localZ = local.z * scale + options.offsetZOrZero();
+            Vec3d offset = pose.localToWorld(localX, localY, localZ, appliedYaw, appliedPitch);
             result.x = anchor.x + offset.x;
             result.y = anchor.y + offset.y;
             result.z = anchor.z + offset.z;
@@ -143,7 +146,10 @@ public abstract class TrackingMode extends OutsideMode {
         
         // Scale the authored offset instead of replacing it, this way a smooth start still travels from the player to the preset position.
         double scale = options.distance != null ? options.distanceOrDefault(defaultDistance) / Math.max(defaultDistance, 0.0001D) : 1.0D;
-        Vec3d cameraOffset = pose.localToWorld(local.x * scale, local.y, local.z * scale, appliedYaw, appliedPitch);
+        double localX = local.x * scale + options.offsetXOrZero();
+        double localY = local.y + options.offsetYOrZero();
+        double localZ = local.z * scale + options.offsetZOrZero();
+        Vec3d cameraOffset = pose.localToWorld(localX, localY, localZ, appliedYaw, appliedPitch);
         Vec3d cameraPos = new Vec3d(anchor.x + cameraOffset.x, anchor.y + cameraOffset.y, anchor.z + cameraOffset.z);
         
         Vec3d lookOffset = pose.localToWorld(0, lookHeight, -lookAhead, appliedYaw, appliedPitch);

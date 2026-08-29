@@ -42,10 +42,12 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
     
     private static final List<String> PRESET_KEYS = Arrays.asList(
         "duration", "distance", "fov", "damping", "pitch_follow", "yaw_follow",
+        "offset_x", "offset_y", "offset_z",
         "enter_style", "exit_style", "enter_duration", "exit_duration", "return_duration", "fade_color"
     );
     private static final List<String> TRACKING_KEYS = Arrays.asList(
         "duration", "distance_scale", "fov", "damping", "pitch_follow", "yaw_follow",
+        "offset_x", "offset_y", "offset_z",
         "enter_style", "exit_style", "enter_duration", "exit_duration", "return_duration", "fade_color"
     );
     
@@ -142,6 +144,15 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
                     break;
                 case "yaw_follow":
                     options.yawFollow = reader.readDouble();
+                    break;
+                case "offset_x":
+                    options.offsetX = reader.readDouble();
+                    break;
+                case "offset_y":
+                    options.offsetY = reader.readDouble();
+                    break;
+                case "offset_z":
+                    options.offsetZ = reader.readDouble();
                     break;
                 case "enter_style": {
                     String styleStr = readToken(reader);
@@ -279,6 +290,9 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
                 return SharedSuggestionProvider.suggest(examples, currentBuilder);
             } else if ("yaw_follow".equals(key)) {
                 List<String> examples = Arrays.asList(prefix + "0.0", prefix + "0.75", prefix + "1.0");
+                return SharedSuggestionProvider.suggest(examples, currentBuilder);
+            } else if ("offset_x".equals(key) || "offset_y".equals(key) || "offset_z".equals(key)) {
+                List<String> examples = Arrays.asList(prefix + "-2.0", prefix + "-1.0", prefix + "-0.5", prefix + "0", prefix + "0.5", prefix + "1.0", prefix + "2.0");
                 return SharedSuggestionProvider.suggest(examples, currentBuilder);
             }
             return Suggestions.empty();
