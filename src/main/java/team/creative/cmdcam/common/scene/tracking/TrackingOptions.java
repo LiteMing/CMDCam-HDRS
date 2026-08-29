@@ -26,9 +26,11 @@ public class TrackingOptions {
     public static final double MAX_PITCH_FOLLOW = 1.0D;
     public static final double MIN_YAW_FOLLOW = 0.0D;
     public static final double MAX_YAW_FOLLOW = 1.0D;
-    public static final long MIN_RETURN_DURATION_MS = 0L;
-    public static final long MAX_RETURN_DURATION_MS = 10000L;
+    public static final long MIN_TRANSITION_DURATION_MS = 0L;
+    public static final long MAX_TRANSITION_DURATION_MS = 10000L;
     public static final long DEFAULT_RETURN_DURATION_MS = 750L;
+    public static final long DEFAULT_ENTER_DURATION_MS = 750L;
+    public static final int DEFAULT_FADE_COLOR = 0x000000;
     
     /** id of the camera mode used to run the scene, e.g. {@code closeup}, {@code shoulder} or {@code tracking} */
     public String modeId;
@@ -54,8 +56,20 @@ public class TrackingOptions {
     /** height anchor on the target bounding box, {@code 0..1} */
     public Double targetHeightFactor;
     
-    /** duration of the smooth return to the player, in milliseconds */
+    /** entry transition style */
+    public CamTransitionStyle enterStyle = CamTransitionStyle.SMOOTH;
+    
+    /** exit transition style */
+    public CamTransitionStyle exitStyle = CamTransitionStyle.SMOOTH;
+    
+    /** duration of the smooth enter or fade-in, in milliseconds */
+    public Long enterDurationMs;
+    
+    /** duration of the smooth return to the player or fade-out, in milliseconds */
     public long returnDurationMs = DEFAULT_RETURN_DURATION_MS;
+    
+    /** color used for fade transition, RGB (default 0x000000 = black) */
+    public Integer fadeColor;
     
     public TrackingOptions() {
         this(null);
@@ -74,7 +88,11 @@ public class TrackingOptions {
         options.pitchFollow = pitchFollow;
         options.yawFollow = yawFollow;
         options.targetHeightFactor = targetHeightFactor;
+        options.enterStyle = enterStyle;
+        options.exitStyle = exitStyle;
+        options.enterDurationMs = enterDurationMs;
         options.returnDurationMs = returnDurationMs;
+        options.fadeColor = fadeColor;
         return options;
     }
     
@@ -106,8 +124,17 @@ public class TrackingOptions {
         return targetHeightFactor != null ? Mth.clamp(targetHeightFactor, 0.0D, 1.0D) : fallback;
     }
     
+    public long enterDurationOrDefault(long fallback) {
+        return enterDurationMs != null && enterDurationMs >= MIN_TRANSITION_DURATION_MS && enterDurationMs <= MAX_TRANSITION_DURATION_MS
+                ? enterDurationMs : fallback;
+    }
+    
     public long returnDurationOrDefault(long fallback) {
-        return returnDurationMs >= MIN_RETURN_DURATION_MS && returnDurationMs <= MAX_RETURN_DURATION_MS ? returnDurationMs : fallback;
+        return returnDurationMs >= MIN_TRANSITION_DURATION_MS && returnDurationMs <= MAX_TRANSITION_DURATION_MS ? returnDurationMs : fallback;
+    }
+    
+    public int fadeColorOrDefault(int fallback) {
+        return fadeColor != null ? fadeColor : fallback;
     }
     
     private static boolean invalid(Double value, double min, double max) {
@@ -130,6 +157,10 @@ public class TrackingOptions {
             throw new SceneException("scene.tracking.invalid_yaw_follow", MIN_YAW_FOLLOW, MAX_YAW_FOLLOW);
         if (invalid(targetHeightFactor, 0.0D, 1.0D))
             throw new SceneException("scene.tracking.invalid_height_factor", 0.0D, 1.0D);
+        if (enterDurationMs != null && (enterDurationMs < MIN_TRANSITION_DURATION_MS || enterDurationMs > MAX_TRANSITION_DURATION_MS))
+            throw new SceneException("scene.tracking.invalid_enter_duration", MIN_TRANSITION_DURATION_MS, MAX_TRANSITION_DURATION_MS);
+        if (returnDurationMs < MIN_TRANSITION_DURATION_MS || returnDurationMs > MAX_TRANSITION_DURATION_MS)
+            throw new SceneException("scene.tracking.invalid_exit_duration", MIN_TRANSITION_DURATION_MS, MAX_TRANSITION_DURATION_MS);
     }
     
     public CompoundTag save(CompoundTag nbt) {
@@ -149,7 +180,15 @@ public class TrackingOptions {
             nbt.putDouble("yaw_follow", yawFollow);
         if (targetHeightFactor != null)
             nbt.putDouble("height_factor", targetHeightFactor);
+        if (enterStyle != null)
+            nbt.putString("enter_style", enterStyle.getId());
+        if (exitStyle != null)
+            nbt.putString("exit_style", exitStyle.getId());
+        if (enterDurationMs != null)
+            nbt.putLong("enter_duration", enterDurationMs);
         nbt.putLong("return_duration", returnDurationMs);
+        if (fadeColor != null)
+            nbt.putInt("fade_color", fadeColor);
         return nbt;
     }
     
@@ -165,7 +204,15 @@ public class TrackingOptions {
         options.pitchFollow = nbt.contains("pitch_follow") ? nbt.getDouble("pitch_follow") : null;
         options.yawFollow = nbt.contains("yaw_follow") ? nbt.getDouble("yaw_follow") : null;
         options.targetHeightFactor = nbt.contains("height_factor") ? nbt.getDouble("height_factor") : null;
+        if (nbt.contains("enter_style"))
+            options.enterStyle = CamTransitionStyle.fromString(nbt.getString("enter_style"));
+        if (nbt.contains("exit_style"))
+            options.exitStyle = CamTransitionStyle.fromString(nbt.getString("exit_style"));
+        if (nbt.contains("enter_duration"))
+            options.enterDurationMs = nbt.getLong("enter_duration");
         options.returnDurationMs = nbt.contains("return_duration") ? nbt.getLong("return_duration") : DEFAULT_RETURN_DURATION_MS;
+        if (nbt.contains("fade_color"))
+            options.fadeColor = nbt.getInt("fade_color");
         return options;
     }
     

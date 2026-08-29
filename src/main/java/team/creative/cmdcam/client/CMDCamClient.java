@@ -292,6 +292,14 @@ public class CMDCamClient {
             }
         }
         
+        // Handle fade-in transition
+        if (scene.trackingOptions != null && scene.trackingOptions.enterStyle == team.creative.cmdcam.common.scene.tracking.CamTransitionStyle.FADE) {
+            long duration = scene.trackingOptions.enterDurationOrDefault(750L);
+            int color = scene.trackingOptions.fadeColorOrDefault(0x000000);
+            CamFadeController.startFullTransition(duration, color, () -> startNow(scene), null);
+            return;
+        }
+        
         // Target is available (or scene does not use tracking) -- start immediately.
         startNow(scene);
     }
@@ -322,6 +330,14 @@ public class CMDCamClient {
     public static void requestStop(CamStopReason reason) {
         if (playing == null)
             return;
+        
+        if (playing.tracking && playing.trackingOptions != null && playing.trackingOptions.exitStyle == team.creative.cmdcam.common.scene.tracking.CamTransitionStyle.FADE) {
+            long duration = playing.trackingOptions.returnDurationOrDefault(750L);
+            int color = playing.trackingOptions.fadeColorOrDefault(0x000000);
+            CamFadeController.startFullTransition(duration, color, () -> finishImmediately(reason), null);
+            return;
+        }
+        
         if (reason.smoothReturn && playing.tracking && playing.run != null)
             playing.run.requestReturn(reason);
         else
@@ -329,9 +345,10 @@ public class CMDCamClient {
     }
     
     public static void finishImmediately(CamStopReason reason) {
-        // Always clear the pending queue on any finish path, including world-unload and
-        // dimension change, so a queued closeup can never start after the level is gone.
+        // Always clear the pending queue and fade controller on any finish path,
+        // including world-unload and dimension change.
         cancelPendingStart();
+        CamFadeController.reset();
         
         CamScene current = playing;
         if (current == null)

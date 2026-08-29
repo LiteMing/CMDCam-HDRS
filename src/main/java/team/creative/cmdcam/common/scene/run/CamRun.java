@@ -50,7 +50,17 @@ public class CamRun {
         Entity camera = Minecraft.getInstance().player;
         this.scene = scene;
         
-        if (scene.smoothBeginning) { // Smooth start from current player position
+        boolean smoothEntry = scene.smoothBeginning;
+        long enterDuration = 750L;
+        if (scene.trackingOptions != null) {
+            if (scene.trackingOptions.enterStyle == team.creative.cmdcam.common.scene.tracking.CamTransitionStyle.CUT)
+                smoothEntry = false;
+            enterDuration = scene.trackingOptions.enterDurationOrDefault(750L);
+            if (enterDuration <= 0)
+                smoothEntry = false;
+        }
+        
+        if (smoothEntry) { // Smooth start from current player position
             CamPoints points = new CamPoints();
             CamPoint camPoint = CamPoint.create(camera);
             boolean smoothOk = true;
@@ -67,7 +77,10 @@ public class CamRun {
                 points.add(scene.points.get(0).copy());
                 points.after(scene.points.get(0).copy());
                 points.fixSpinning(CamPitchMode.FIX);
-                stages.add(new CamRunStage(this, CamInterpolation.HERMITE, (long) Mth.clampedLerp(points.estimateLength() / 10, 1000, 20000), 0, points));
+                long duration = scene.trackingOptions != null && scene.trackingOptions.enterDurationMs != null
+                    ? enterDuration
+                    : (long) Mth.clampedLerp(points.estimateLength() / 10, 1000, 20000);
+                stages.add(new CamRunStage(this, CamInterpolation.HERMITE, duration, 0, points));
             }
         }
         
@@ -115,7 +128,10 @@ public class CamRun {
             stages.add(new CamRunStage(this, scene.interpolation, scene.duration, 0, points));
         }
         
-        if (scene.tracking && scene.targetReturnDuration > 0 && camera != null) {
+        boolean smoothExit = scene.tracking && scene.targetReturnDuration > 0 && camera != null;
+        if (scene.trackingOptions != null && scene.trackingOptions.exitStyle == team.creative.cmdcam.common.scene.tracking.CamTransitionStyle.CUT)
+            smoothExit = false;
+        if (smoothExit) {
             CamPoints points = new CamPoints();
             CamPoint p = CamPoint.create(camera);
             points.add(p);

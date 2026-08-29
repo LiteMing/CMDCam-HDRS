@@ -29,6 +29,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent.Stage;
 import net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles;
@@ -121,6 +122,8 @@ public class CamEventHandlerClient {
     public void onClientTick(ClientTickEvent event) {
         if (event.phase == Phase.END)
             return;
+        // Update fade transitions
+        CamFadeController.update();
         // Cancel (or finish) on player death regardless of pending/playing state.
         if (MC.player != null && (!MC.player.isAlive() || MC.player.isRemoved())) {
             if (CMDCamClient.hasPendingTrackingStart() || CMDCamClient.isPlaying())
@@ -382,6 +385,13 @@ public class CamEventHandlerClient {
     @SubscribeEvent
     public void cameraRoll(ComputeCameraAngles event) {
         event.setRoll(roll);
+    }
+    
+    @SubscribeEvent
+    public void onRenderGuiOverlay(RenderGuiOverlayEvent.Post event) {
+        if (CamFadeController.isActive()) {
+            CamFadeController.renderOverlay(MC.getWindow().getGuiScaledWidth(), MC.getWindow().getGuiScaledHeight());
+        }
     }
     
     @SubscribeEvent

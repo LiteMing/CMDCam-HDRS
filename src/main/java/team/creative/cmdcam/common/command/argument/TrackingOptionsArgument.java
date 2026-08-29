@@ -22,6 +22,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.minecraft.commands.SharedSuggestionProvider;
 import team.creative.cmdcam.client.SceneException;
 import team.creative.cmdcam.common.scene.tracking.CamPreset;
+import team.creative.cmdcam.common.scene.tracking.CamTransitionStyle;
 import team.creative.cmdcam.common.scene.tracking.TrackingOptions;
 
 public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgument.ParsedOptions> {
@@ -34,12 +35,18 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
         new LiteralMessage("Expected '=' after option key"));
     private static final SimpleCommandExceptionType INVALID_OPTION = new SimpleCommandExceptionType(
         new LiteralMessage("Invalid option"));
+    private static final DynamicCommandExceptionType INVALID_STYLE = new DynamicCommandExceptionType(
+        style -> new LiteralMessage("Invalid transition style: '" + style + "'. Expected: cut, smooth, fade"));
+    private static final DynamicCommandExceptionType INVALID_COLOR = new DynamicCommandExceptionType(
+        color -> new LiteralMessage("Invalid color: '" + color + "'. Expected: black, white, or #RRGGBB"));
     
     private static final List<String> PRESET_KEYS = Arrays.asList(
-        "duration", "distance", "fov", "damping", "pitch_follow", "yaw_follow"
+        "duration", "distance", "fov", "damping", "pitch_follow", "yaw_follow",
+        "enter_style", "exit_style", "enter_duration", "exit_duration", "return_duration", "fade_color"
     );
     private static final List<String> TRACKING_KEYS = Arrays.asList(
-        "duration", "distance_scale", "fov", "damping", "pitch_follow", "yaw_follow"
+        "duration", "distance_scale", "fov", "damping", "pitch_follow", "yaw_follow",
+        "enter_style", "exit_style", "enter_duration", "exit_duration", "return_duration", "fade_color"
     );
     
     public static class ParsedOptions {
@@ -98,11 +105,13 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
                 throw UNKNOWN_KEY.createWithContext(reader, key);
             }
             
-            if (seenKeys.contains(key)) {
+            // Map alias return_duration to exit_duration
+            String canonicalKey = "return_duration".equals(key) ? "exit_duration" : key;
+            if (seenKeys.contains(canonicalKey)) {
                 reader.setCursor(keyStart);
                 throw DUPLICATE_KEY.createWithContext(reader, key);
             }
-            seenKeys.add(key);
+            seenKeys.add(canonicalKey);
             
             reader.skipWhitespace();
             if (!reader.canRead() || reader.peek() != '=') {
@@ -134,6 +143,38 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
                 case "yaw_follow":
                     options.yawFollow = reader.readDouble();
                     break;
+                case "enter_style": {
+                    String styleStr = readToken(reader);
+                    CamTransitionStyle style = CamTransitionStyle.fromString(styleStr);
+                    if (style == null) {
+                        reader.setCursor(valStart);
+                        throw INVALID_STYLE.createWithContext(reader, styleStr);
+                    }
+                    options.enterStyle = style;
+                    break;
+                }
+                case "exit_style": {
+                    String styleStr = readToken(reader);
+                    CamTransitionStyle style = CamTransitionStyle.fromString(styleStr);
+                    if (style == null) {
+                        reader.setCursor(valStart);
+                        throw INVALID_STYLE.createWithContext(reader, styleStr);
+                    }
+                    options.exitStyle = style;
+                    break;
+                }
+                case "enter_duration":
+                    options.enterDurationMs = DurationArgument.duration().parse(reader);
+                    break;
+                case "exit_duration":
+                case "return_duration":
+                    options.returnDurationMs = DurationArgument.duration().parse(reader);
+                    break;
+                case "fade_color": {
+                    String colorStr = readToken(reader);
+                    options.fadeColor = parseColor(reader, valStart, colorStr);
+                    break;
+                }
                 default:
                     reader.setCursor(valStart);
                     throw UNKNOWN_KEY.createWithContext(reader, key);
@@ -149,6 +190,35 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
         }
         
         return new ParsedOptions(options, durationMs);
+    }
+    
+    private static String readToken(StringReader reader) {
+        int start = reader.getCursor();
+        while (reader.canRead() && !Character.isWhitespace(reader.peek())) {
+            reader.skip();
+        }
+        return reader.getString().substring(start, reader.getCursor());
+    }
+    
+    private static int parseColor(StringReader reader, int valStart, String colorStr) throws CommandSyntaxException {
+        if ("black".equalsIgnoreCase(colorStr))
+            return 0x000000;
+        if ("white".equalsIgnoreCase(colorStr))
+            return 0xFFFFFF;
+        if ("red".equalsIgnoreCase(colorStr))
+            return 0xFF0000;
+        if ("blue".equalsIgnoreCase(colorStr))
+            return 0x0000FF;
+        if ("green".equalsIgnoreCase(colorStr))
+            return 0x00FF00;
+        
+        String hex = colorStr.startsWith("#") ? colorStr.substring(1) : colorStr;
+        try {
+            return Integer.parseInt(hex, 16);
+        } catch (NumberFormatException e) {
+            reader.setCursor(valStart);
+            throw INVALID_COLOR.createWithContext(reader, colorStr);
+        }
     }
     
     @Override
@@ -167,8 +237,12 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
         if (!completedPart.isEmpty()) {
             for (String part : completedPart.split("\\s+")) {
                 int eq = part.indexOf('=');
-                if (eq > 0)
-                    presentKeys.add(part.substring(0, eq).toLowerCase(Locale.ROOT));
+                if (eq > 0) {
+                    String k = part.substring(0, eq).toLowerCase(Locale.ROOT);
+                    if ("return_duration".equals(k))
+                        k = "exit_duration";
+                    presentKeys.add(k);
+                }
             }
         }
         
@@ -178,8 +252,14 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
             int eqIdx = currentToken.indexOf('=');
             String key = currentToken.substring(0, eqIdx).toLowerCase(Locale.ROOT);
             String prefix = currentToken.substring(0, eqIdx + 1);
-            if ("duration".equals(key)) {
-                List<String> examples = Arrays.asList(prefix + "160t", prefix + "8s", prefix + "5000ms");
+            if ("duration".equals(key) || "enter_duration".equals(key) || "exit_duration".equals(key) || "return_duration".equals(key)) {
+                List<String> examples = Arrays.asList(prefix + "160t", prefix + "750ms", prefix + "1s", prefix + "500ms");
+                return SharedSuggestionProvider.suggest(examples, currentBuilder);
+            } else if ("enter_style".equals(key) || "exit_style".equals(key)) {
+                List<String> examples = Arrays.asList(prefix + "smooth", prefix + "cut", prefix + "fade");
+                return SharedSuggestionProvider.suggest(examples, currentBuilder);
+            } else if ("fade_color".equals(key)) {
+                List<String> examples = Arrays.asList(prefix + "black", prefix + "white", prefix + "#000000", prefix + "#FFFFFF");
                 return SharedSuggestionProvider.suggest(examples, currentBuilder);
             } else if ("fov".equals(key)) {
                 List<String> examples = Arrays.asList(prefix + "30", prefix + "50", prefix + "70", prefix + "90");
@@ -203,7 +283,8 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
         List<String> allowed = getAllowedKeys();
         List<String> candidates = new ArrayList<>();
         for (String k : allowed) {
-            if (!presentKeys.contains(k)) {
+            String canonical = "return_duration".equals(k) ? "exit_duration" : k;
+            if (!presentKeys.contains(canonical)) {
                 candidates.add(k + "=");
             }
         }
@@ -214,7 +295,7 @@ public class TrackingOptionsArgument implements ArgumentType<TrackingOptionsArgu
     @Override
     public Collection<String> getExamples() {
         return isPreset
-            ? Arrays.asList("fov=50", "distance=2.5 fov=60", "duration=160t damping=500", "yaw_follow=0.75")
-            : Arrays.asList("fov=50", "distance_scale=1.5 fov=60", "duration=160t damping=500", "yaw_follow=1.0");
+            ? Arrays.asList("fov=50 enter_style=fade enter_duration=500ms", "exit_style=fade fade_color=black", "duration=160t damping=500 yaw_follow=0.75")
+            : Arrays.asList("distance_scale=1.5 fov=60 enter_style=cut", "enter_style=fade exit_style=fade fade_color=white");
     }
 }
