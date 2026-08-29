@@ -18,6 +18,8 @@ import net.minecraft.network.chat.Component;
 import team.creative.cmdcam.client.SceneException;
 import team.creative.cmdcam.common.command.CamCommandProcessor;
 import team.creative.cmdcam.common.command.argument.DurationArgument;
+import team.creative.cmdcam.common.command.argument.TrackingOptionsArgument;
+import team.creative.cmdcam.common.command.argument.TrackingOptionsArgument.ParsedOptions;
 import team.creative.cmdcam.common.scene.tracking.CamPreset;
 import team.creative.cmdcam.common.scene.tracking.TrackingOptions;
 
@@ -121,51 +123,34 @@ public class SceneStartCommandBuilder {
         return 0;
     }
     
-    /** Appends the optional camera parameters in a fixed order, every level accepts the same command so any suffix can be left out. */
+    /** Attaches key=value options argument to the node. Accepts empty options (defaults) or any combination of key=value pairs. */
     private static ArgumentBuilder<CommandSourceStack, ?> options(ArgumentBuilder<CommandSourceStack, ?> node, CamCommandProcessor processor, String modeId,
-            boolean absoluteDistance) {
+            boolean isPreset) {
         OptionStarter starter = CamPreset.TRACKING.equals(modeId) ? processor::startTracking : processor::startPreset;
-        Command<CommandSourceStack> command = x -> runOptions(x, modeId, absoluteDistance, starter);
         
-        node.executes(command);
-        ArgumentBuilder<CommandSourceStack, ?> current = node;
-        current = append(current, "duration", DurationArgument.duration(), command);
-        current = append(current, absoluteDistance ? "distance" : "distance_scale", DoubleArgumentType.doubleArg(), command);
-        current = append(current, "fov", DoubleArgumentType.doubleArg(), command);
-        current = append(current, "damping", DoubleArgumentType.doubleArg(), command);
-        current = append(current, "pitch_follow", DoubleArgumentType.doubleArg(), command);
+        // Execute without options (all defaults)
+        node.executes(x -> {
+            try {
+                starter.start(x, new TrackingOptions(modeId), 0L);
+            } catch (SceneException e) {
+                x.getSource().sendFailure(e.getComponent());
+            }
+            return 0;
+        });
+        
+        // Execute with key=value options
+        TrackingOptionsArgument argType = isPreset ? TrackingOptionsArgument.preset(modeId) : TrackingOptionsArgument.tracking();
+        node.then(Commands.argument("options", argType).executes(x -> {
+            try {
+                ParsedOptions parsed = x.getArgument("options", ParsedOptions.class);
+                starter.start(x, parsed.options, parsed.durationMs);
+            } catch (SceneException e) {
+                x.getSource().sendFailure(e.getComponent());
+            }
+            return 0;
+        }));
+        
         return node;
-    }
-    
-    private static int runOptions(CommandContext<CommandSourceStack> x, String modeId, boolean absoluteDistance, OptionStarter starter) {
-        try {
-            TrackingOptions options = readOptions(x, modeId, absoluteDistance);
-            options.validate();
-            starter.start(x, options, durationOr(x, 0L));
-        } catch (SceneException e) {
-            x.getSource().sendFailure(e.getComponent());
-        }
-        return 0;
-    }
-    
-    private static TrackingOptions readOptions(CommandContext<CommandSourceStack> x, String modeId, boolean absoluteDistance) {
-        TrackingOptions options = new TrackingOptions(modeId);
-        if (absoluteDistance)
-            options.distance = optional(x, "distance", Double.class);
-        else
-            options.distanceScale = optional(x, "distance_scale", Double.class);
-        options.fov = optional(x, "fov", Double.class);
-        options.dampingMs = optional(x, "damping", Double.class);
-        options.pitchFollow = optional(x, "pitch_follow", Double.class);
-        return options;
-    }
-    
-    private static ArgumentBuilder<CommandSourceStack, ?> append(ArgumentBuilder<CommandSourceStack, ?> parent, String name, ArgumentType<?> type,
-            Command<CommandSourceStack> command) {
-        ArgumentBuilder<CommandSourceStack, ?> argument = Commands.argument(name, type);
-        argument.executes(command);
-        parent.then(argument);
-        return argument;
     }
     
     private static void warnDeprecated(CommandContext<CommandSourceStack> x) {

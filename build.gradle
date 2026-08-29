@@ -88,3 +88,10 @@ mixin {
     config 'cmdcam.mixins.json'
 }
 
+tasks.named('jar', Jar).configure {
+    archiveBaseName = project.mod_id
+    archiveVersion = project.mod_version
+    archiveClassifier = ''
+}
+
+
