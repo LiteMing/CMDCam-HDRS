@@ -98,8 +98,21 @@ public abstract class TrackingMode extends OutsideMode {
     }
     
     /** Whether the control points of the scene are used as local offsets instead of a fixed preset offset. */
-    protected boolean usesTemplatePath() {
+    public boolean usesTemplatePath() {
         return false;
+    }
+    
+    public void compensateSmoothEntryStart(CamPoint point, TrackingOptions options) {
+        if (options == null)
+            return;
+        double scale = usesTemplatePath()
+            ? options.distanceScaleOrDefault(1.0D)
+            : options.distance != null
+                ? options.distanceOrDefault(defaultDistance) / Math.max(defaultDistance, 0.0001D)
+                : 1.0D;
+        point.x = (point.x - options.offsetXOrZero()) / Math.max(scale, 0.0001D);
+        point.y -= options.offsetYOrZero();
+        point.z = (point.z - options.offsetZOrZero()) / Math.max(scale, 0.0001D);
     }
     
     protected TrackingOptions options() {

@@ -75,6 +75,9 @@ public class CamRun {
                 smoothOk = false;
             }
             if (smoothOk) {
+                if (scene.mode instanceof team.creative.cmdcam.common.scene.mode.TrackingMode trackingMode) {
+                    trackingMode.compensateSmoothEntryStart(camPoint, scene.trackingOptions);
+                }
                 points.add(camPoint);
                 points.add(scene.points.get(0).copy());
                 points.after(scene.points.get(0).copy());

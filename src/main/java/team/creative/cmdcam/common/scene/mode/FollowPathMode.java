@@ -44,7 +44,7 @@ public class FollowPathMode extends TrackingMode {
     }
     
     @Override
-    protected boolean usesTemplatePath() {
+    public boolean usesTemplatePath() {
         return true;
     }
     
